@@ -2,6 +2,7 @@ import UIKit
 import Flutter
 import Security
 import Foundation
+import PDFKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -15,11 +16,13 @@ import Foundation
     
     cryptoChannel.setMethodCallHandler({
       (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
-      guard call.method == "getCertificateInfo" else {
+      if call.method == "getCertificateInfo" {
+        self.handleGetCertificateInfo(call: call, result: result)
+      } else if call.method == "signPdf" {
+        self.handleSignPdf(call: call, result: result)
+      } else {
         result(FlutterMethodNotImplemented)
-        return
       }
-      self.handleGetCertificateInfo(call: call, result: result)
     })
     
     GeneratedPluginRegistrant.register(with: self)
@@ -191,12 +194,30 @@ qPKU+bM0H9Btm86PyPnoWC6P23Rxky+LXFPT6+4B
         result(FlutterError(code: "CERT_DATA_ERROR", message: "No se pudo obtener los datos del certificado.", details: nil))
         return
       }
-      let certInfo = CertificateHelper.parseCertificateInfo(certData)
+      let certInfoObj = CertificateHelper.parseCertificateInfo(certData)
+      var certInfo: [String: Any] = [:]
+      if let dict = certInfoObj as? [String: Any] {
+        certInfo = dict
+      } else if let str = certInfoObj as? NSString {
+        print("⚠️ Recibido NSString: \(str)")
+        if let data = str.data(using: String.Encoding.utf8.rawValue),
+           let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+          certInfo = json
+        } else {
+          certInfo = ["error": "No se pudo convertir el string en JSON"]
+        }
+      } else if let data = certInfoObj as? NSData,
+                let json = try? JSONSerialization.jsonObject(with: data as Data, options: []) as? [String: Any] {
+        certInfo = json
+      } else {
+        let tipo = String(describing: type(of: certInfoObj))
+        certInfo = ["error": "Tipo de objeto no manejado: \(tipo)"]
+      }
       let resultDict: [String: Any] = [
-          "subject": certInfo,
-          "issuer": "",
-          "validFrom": 0,
-          "validTo": 0,
+          "subject": certInfo["subject"] ?? "N/A",
+          "issuer": certInfo["issuer"] ?? "N/A",
+          "validFrom": certInfo["validFrom"] ?? 0,
+          "validTo": certInfo["validTo"] ?? 0,
           "isTrusted": isTrusted
       ]
       result(resultDict)
@@ -205,4 +226,123 @@ qPKU+bM0H9Btm86PyPnoWC6P23Rxky+LXFPT6+4B
       result(FlutterError(code: "FILE_READ_ERROR", message: "No se pudo leer el archivo en la ruta: \(p12Path)", details: error.localizedDescription))
     }
   }
+
+  private func handleSignPdf(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard let args = call.arguments as? [String: Any],
+          let pdfPath = args["pdfPath"] as? String,
+          let p12Path = args["p12Path"] as? String,
+          let password = args["password"] as? String,
+          let page = args["page"] as? Int,
+          let x = args["x"] as? Double,
+          let y = args["y"] as? Double else {
+      result(FlutterError(code: "INVALID_ARGUMENTS", message: "Faltan argumentos para firmar el PDF.", details: nil))
+      return
+    }
+    print("[NATIVO] Firmando PDF: \(pdfPath) con certificado: \(p12Path) en página: \(page) posición: (\(x), \(y))")
+    // --- Firma visible con PDFKit ---
+    guard let pdfDocument = PDFDocument(url: URL(fileURLWithPath: pdfPath)) else {
+      result(FlutterError(code: "PDFKIT_ERROR", message: "No se pudo abrir el PDF con PDFKit.", details: nil))
+      return
+    }
+    guard let pdfPage = pdfDocument.page(at: page) else {
+      result(FlutterError(code: "PAGE_ERROR", message: "No se pudo obtener la página indicada del PDF.", details: nil))
+      return
+    }
+    // Datos de la estampilla
+    let signerName: String
+    if let subject = args["subject"] as? String, !subject.isEmpty {
+      signerName = "Firmante: \(subject)"
+    } else {
+      signerName = "Firmante: Desconocido"
+    }
+    let issuer = args["issuer"] as? String ?? "N/A"
+    let validFromStr: String = {
+      if let s = args["validFrom"] as? String, let date = ISO8601DateFormatter().date(from: s) {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        return fmt.string(from: date)
+      } else { return "N/A" }
+    }()
+    let validToStr: String = {
+      if let s = args["validTo"] as? String, let date = ISO8601DateFormatter().date(from: s) {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        return fmt.string(from: date)
+      } else { return "N/A" }
+    }()
+    let stampSize = CGSize(width: 110, height: 44) // Más pequeña
+    // Crear imagen de la estampilla
+    let renderer = UIGraphicsImageRenderer(size: stampSize)
+    let stampImage = renderer.image { ctx in
+      // Fondo blanco con borde azul
+      let rect = CGRect(origin: .zero, size: stampSize)
+      ctx.cgContext.setFillColor(UIColor.white.withAlphaComponent(0.95).cgColor)
+      ctx.cgContext.fill(rect)
+      ctx.cgContext.setStrokeColor(UIColor.systemBlue.cgColor)
+      ctx.cgContext.setLineWidth(2)
+      ctx.cgContext.stroke(rect)
+      // Icono
+      let checkmark = UIImage(systemName: "checkmark.seal.fill")?.withTintColor(.systemBlue, renderingMode: .alwaysOriginal)
+      checkmark?.draw(in: CGRect(x: 4, y: 4, width: 18, height: 18))
+      // Texto
+      let paragraph = NSMutableParagraphStyle()
+      paragraph.alignment = .left
+      let attrs: [NSAttributedString.Key: Any] = [
+        .font: UIFont.boldSystemFont(ofSize: 9),
+        .foregroundColor: UIColor.black,
+        .paragraphStyle: paragraph
+      ]
+      let attrs2: [NSAttributedString.Key: Any] = [
+        .font: UIFont.systemFont(ofSize: 8),
+        .foregroundColor: UIColor.darkGray,
+        .paragraphStyle: paragraph
+      ]
+      (signerName).draw(in: CGRect(x: 26, y: 2, width: 80, height: 12), withAttributes: attrs)
+      ("CA: \(issuer)").draw(in: CGRect(x: 4, y: 20, width: 102, height: 10), withAttributes: attrs2)
+      ("Desde: \(validFromStr)").draw(in: CGRect(x: 4, y: 30, width: 52, height: 10), withAttributes: attrs2)
+      ("Hasta: \(validToStr)").draw(in: CGRect(x: 56, y: 30, width: 52, height: 10), withAttributes: attrs2)
+    }
+    // Insertar la imagen en la página PDF usando la subclase
+    let pdfBounds = pdfPage.bounds(for: .mediaBox)
+    let stampRect = CGRect(x: x, y: pdfBounds.height - y - stampSize.height, width: stampSize.width, height: stampSize.height)
+    let annotation = CustomImageAnnotation(bounds: stampRect, image: stampImage)
+    pdfPage.addAnnotation(annotation)
+    // Guardar el PDF firmado
+    let originalUrl = URL(fileURLWithPath: pdfPath)
+    let signedUrl = originalUrl.deletingLastPathComponent().appendingPathComponent(originalUrl.deletingPathExtension().lastPathComponent + "_signed.pdf")
+    if pdfDocument.write(to: signedUrl) {
+      result(signedUrl.path)
+    } else {
+      result(FlutterError(code: "SAVE_ERROR", message: "No se pudo guardar el PDF firmado.", details: nil))
+    }
+    // --- FIRMA DIGITAL REAL (PKCS#7) ---
+    // Aquí es donde debe integrarse la lógica de firma digital real.
+    // Pasos sugeridos:
+    // 1. Extraer la clave privada y el certificado del archivo .p12 usando SecPKCS12Import.
+    // 2. Usar una librería de firma digital (como objective-pdf-signature, OpenSSL, o un SDK comercial como PSPDFKit) para:
+    //    a) Crear un campo de firma en el PDF.
+    //    b) Generar la firma PKCS#7 usando la clave privada.
+    //    c) Insertar la firma digital en el PDF.
+    // 3. Guardar el PDF firmado y devolver la ruta.
+    // NOTA: PDFKit NO soporta firma digital nativa, por lo que es necesario integrar una librería externa.
+    // Ejemplo de integración: https://github.com/ubiqueinnovation/objective-pdf-signature
+    // Por ahora, solo se inserta la firma visible (estampilla). La firma digital real se debe implementar aquí.
+  }
+}
+
+// Subclase para anotación de imagen personalizada
+class CustomImageAnnotation: PDFAnnotation {
+    let image: UIImage
+    init(bounds: CGRect, image: UIImage) {
+        self.image = image
+        super.init(bounds: bounds, forType: .stamp, withProperties: nil)
+    }
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    override func draw(with box: PDFDisplayBox, in context: CGContext) {
+        UIGraphicsPushContext(context)
+        image.draw(in: self.bounds)
+        UIGraphicsPopContext()
+    }
 }

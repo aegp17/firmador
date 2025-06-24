@@ -2,6 +2,6 @@
 
 @interface CertificateHelper : NSObject
 
-+ (NSString *)parseCertificateInfo:(NSData *)certData;
++ (id)parseCertificateInfo:(NSData *)certData;
 
 @end
