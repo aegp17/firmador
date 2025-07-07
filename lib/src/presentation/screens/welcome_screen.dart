@@ -263,7 +263,7 @@ class WelcomeScreen extends StatelessWidget {
             ),
           ),
           title: const Text(
-            '¿Salir de la aplicación?',
+            '¿Ir a la pantalla de inicio?',
             style: TextStyle(
               color: AppTheme.white,
               fontSize: 18,
@@ -271,7 +271,7 @@ class WelcomeScreen extends StatelessWidget {
             ),
           ),
           content: const Text(
-            '¿Estás seguro de que deseas cerrar FirmaSeguraEC?',
+            'La aplicación se enviará al fondo y podrás volver a ella desde la pantalla de inicio.',
             style: TextStyle(
               color: AppTheme.white,
               fontSize: 14,
@@ -293,19 +293,24 @@ class WelcomeScreen extends StatelessWidget {
               child: TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
-                  SystemNavigator.pop();
+                  _goToHomeScreen();
                 },
                 style: TextButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   foregroundColor: AppTheme.white,
                 ),
-                child: const Text('Salir'),
+                child: const Text('Ir a Inicio'),
               ),
             ),
           ],
         );
       },
     );
+  }
+
+  void _goToHomeScreen() {
+    // Envía la app al fondo para ir a la pantalla de inicio
+    SystemNavigator.pop();
   }
 }
 
