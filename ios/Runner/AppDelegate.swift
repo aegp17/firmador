@@ -218,6 +218,9 @@ qPKU+bM0H9Btm86PyPnoWC6P23Rxky+LXFPT6+4B
           "issuer": certInfo["issuer"] ?? "N/A",
           "validFrom": certInfo["validFrom"] ?? 0,
           "validTo": certInfo["validTo"] ?? 0,
+          "serialNumber": certInfo["serialNumber"] ?? "N/A",
+          "commonName": certInfo["commonName"] ?? "N/A",
+          "keyUsages": certInfo["keyUsages"] ?? [],
           "isTrusted": isTrusted
       ]
       result(resultDict)

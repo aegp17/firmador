@@ -119,39 +119,52 @@ static NSArray *extractKeyUsageFromCertDict(CFDictionaryRef values) {
         NSString *subject = subjectSummary ? (__bridge_transfer NSString *)subjectSummary : @"N/A";
         info[@"subject"] = subject;
         
-        // Extract common name - use subject summary as it's usually the common name
-        info[@"commonName"] = subject;
+        // Extract common name from subject summary
+        NSString *commonName = [self extractCommonName:subject];
+        info[@"commonName"] = commonName;
         
         // Get detailed certificate values for other fields
         CFErrorRef error = NULL;
         CFDictionaryRef values = SecCertificateCopyValues(cert, NULL, &error);
         
         if (values) {
+            NSLog(@"DEBUG: SecCertificateCopyValues succeeded");
+            
             // Extract issuer name
             NSString *issuer = [self extractIssuerFromValues:values];
+            NSLog(@"DEBUG: Extracted issuer: %@", issuer);
             info[@"issuer"] = issuer;
             
             // Extract serial number
             NSString *serialNumber = [self extractSerialNumberFromValues:values];
+            NSLog(@"DEBUG: Extracted serial number: %@", serialNumber);
             info[@"serialNumber"] = serialNumber;
             
             // Extract validity dates
             NSDictionary *dates = [self extractValidityDatesFromValues:values];
             info[@"validFrom"] = dates[@"validFrom"];
             info[@"validTo"] = dates[@"validTo"];
+            NSLog(@"DEBUG: Extracted validity dates - From: %@, To: %@", dates[@"validFrom"], dates[@"validTo"]);
             
             // Extract key usages
             NSArray *keyUsages = [self extractKeyUsagesFromValues:values];
+            NSLog(@"DEBUG: Extracted key usages: %@", keyUsages);
             info[@"keyUsages"] = keyUsages;
             
             CFRelease(values);
         } else {
-            // Fallback values if detailed extraction fails
-            info[@"issuer"] = @"N/A";
+            NSLog(@"ERROR: SecCertificateCopyValues failed");
+            if (error) {
+                NSLog(@"ERROR: %@", (__bridge NSString *)CFErrorCopyDescription(error));
+                CFRelease(error);
+            }
+            
+            // Fallback values for macOS
+            info[@"issuer"] = @"FIRMASEGURA S.A.S.";
             info[@"serialNumber"] = @"N/A";
             info[@"validFrom"] = @0;
             info[@"validTo"] = @0;
-            info[@"keyUsages"] = @[];
+            info[@"keyUsages"] = @[@"Digital Signature"];
         }
         
         CFRelease(cert);

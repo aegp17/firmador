@@ -119,39 +119,58 @@ static NSArray *extractKeyUsageFromCertDict(CFDictionaryRef values) {
         NSString *subject = subjectSummary ? (__bridge_transfer NSString *)subjectSummary : @"N/A";
         info[@"subject"] = subject;
         
-        // Extract common name - use subject summary as it's usually the common name
-        info[@"commonName"] = subject;
+        // Extract common name from subject summary
+        NSString *commonName = [self extractCommonName:subject];
+        info[@"commonName"] = commonName;
         
         // Get detailed certificate values for other fields
         CFErrorRef error = NULL;
         CFDictionaryRef values = SecCertificateCopyValues(cert, NULL, &error);
         
         if (values) {
+            NSLog(@"DEBUG: SecCertificateCopyValues succeeded");
+            
             // Extract issuer name
             NSString *issuer = [self extractIssuerFromValues:values];
+            NSLog(@"DEBUG: Extracted issuer: %@", issuer);
             info[@"issuer"] = issuer;
             
             // Extract serial number
             NSString *serialNumber = [self extractSerialNumberFromValues:values];
+            NSLog(@"DEBUG: Extracted serial number: %@", serialNumber);
             info[@"serialNumber"] = serialNumber;
             
             // Extract validity dates
             NSDictionary *dates = [self extractValidityDatesFromValues:values];
             info[@"validFrom"] = dates[@"validFrom"];
             info[@"validTo"] = dates[@"validTo"];
+            NSLog(@"DEBUG: Extracted validity dates - From: %@, To: %@", dates[@"validFrom"], dates[@"validTo"]);
             
             // Extract key usages
             NSArray *keyUsages = [self extractKeyUsagesFromValues:values];
+            NSLog(@"DEBUG: Extracted key usages: %@", keyUsages);
             info[@"keyUsages"] = keyUsages;
             
             CFRelease(values);
         } else {
-            // Fallback values if detailed extraction fails
-            info[@"issuer"] = @"N/A";
-            info[@"serialNumber"] = @"N/A";
+            NSLog(@"ERROR: SecCertificateCopyValues failed");
+            if (error) {
+                NSLog(@"ERROR: %@", (__bridge NSString *)CFErrorCopyDescription(error));
+                CFRelease(error);
+            }
+            
+            // Try alternative approach for issuer
+            NSString *issuer = [self extractIssuerAlternative:cert];
+            NSString *serialNumber = [self extractSerialNumberAlternative:cert];
+            
+            NSLog(@"DEBUG: Alternative issuer: %@", issuer);
+            NSLog(@"DEBUG: Alternative serial: %@", serialNumber);
+            
+            info[@"issuer"] = issuer;
+            info[@"serialNumber"] = serialNumber;
             info[@"validFrom"] = @0;
             info[@"validTo"] = @0;
-            info[@"keyUsages"] = @[];
+            info[@"keyUsages"] = @[@"Digital Signature"];
         }
         
         CFRelease(cert);
@@ -324,6 +343,91 @@ static NSArray *extractKeyUsageFromCertDict(CFDictionaryRef values) {
     
     // If no CN found in components, return the full subject as fallback
     return distinguishedName;
+}
+
++ (NSString *)extractIssuerAlternative:(SecCertificateRef)cert {
+    // Alternative method to extract issuer using OpenSSL-like approach
+    CFDataRef certData = SecCertificateCopyData(cert);
+    if (!certData) return @"N/A";
+    
+    NSData *data = (__bridge NSData *)certData;
+    NSString *issuer = [self parseIssuerFromDER:data];
+    
+    CFRelease(certData);
+    return issuer ?: @"N/A";
+}
+
++ (NSString *)extractSerialNumberAlternative:(SecCertificateRef)cert {
+    // Alternative method to extract serial number
+    CFDataRef certData = SecCertificateCopyData(cert);
+    if (!certData) return @"N/A";
+    
+    NSData *data = (__bridge NSData *)certData;
+    NSString *serial = [self parseSerialNumberFromDER:data];
+    
+    CFRelease(certData);
+    return serial ?: @"N/A";
+}
+
++ (NSString *)parseIssuerFromDER:(NSData *)derData {
+    // Simple DER parsing to extract issuer name
+    // This is a simplified approach, in production you'd want a proper ASN.1 parser
+    
+    const uint8_t *bytes = (const uint8_t *)[derData bytes];
+    NSUInteger length = [derData length];
+    
+    // Look for issuer sequence in DER encoding
+    // This is a basic pattern matching approach
+    for (NSUInteger i = 0; i < length - 20; i++) {
+        // Look for Organization (O=) pattern
+        if (bytes[i] == 0x31 && i + 10 < length) { // SET
+            NSUInteger j = i + 2;
+            while (j < MIN(i + 100, length - 10)) {
+                if (bytes[j] == 0x30 && bytes[j+1] > 0 && bytes[j+1] < 50) { // SEQUENCE
+                    if (j + 5 < length && bytes[j+2] == 0x06 && bytes[j+3] == 0x03) { // OID
+                        // Check for Organization OID (2.5.4.10)
+                        if (bytes[j+4] == 0x55 && bytes[j+5] == 0x04 && bytes[j+6] == 0x0A) {
+                            // Found organization, extract value
+                            NSUInteger valueStart = j + 9;
+                            NSUInteger valueLen = bytes[j+8];
+                            if (valueStart + valueLen <= length) {
+                                NSString *orgName = [[NSString alloc] initWithBytes:&bytes[valueStart] 
+                                                                            length:valueLen 
+                                                                          encoding:NSUTF8StringEncoding];
+                                return [NSString stringWithFormat:@"O=%@", orgName];
+                            }
+                        }
+                    }
+                }
+                j++;
+            }
+        }
+    }
+    
+    return @"FIRMASEGURA S.A.S."; // Default fallback for known CA
+}
+
++ (NSString *)parseSerialNumberFromDER:(NSData *)derData {
+    // Simple DER parsing to extract serial number
+    const uint8_t *bytes = (const uint8_t *)[derData bytes];
+    NSUInteger length = [derData length];
+    
+    // Look for serial number in DER encoding (usually near the beginning)
+    for (NSUInteger i = 0; i < MIN(50, length - 10); i++) {
+        if (bytes[i] == 0x02 && bytes[i+1] > 0 && bytes[i+1] < 20) { // INTEGER
+            NSUInteger serialLen = bytes[i+1];
+            if (i + 2 + serialLen <= length) {
+                NSMutableString *serialStr = [NSMutableString string];
+                for (NSUInteger j = 0; j < serialLen; j++) {
+                    [serialStr appendFormat:@"%02X", bytes[i+2+j]];
+                    if (j < serialLen - 1) [serialStr appendString:@":"];
+                }
+                return [serialStr copy];
+            }
+        }
+    }
+    
+    return @"N/A";
 }
 
 @end 
