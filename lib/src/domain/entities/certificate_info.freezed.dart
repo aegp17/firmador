@@ -1,4 +1,3 @@
-// dart format width=80
 // coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint
@@ -10,171 +9,333 @@ part of 'certificate_info.dart';
 // FreezedGenerator
 // **************************************************************************
 
-// dart format off
 T _$identity<T>(T value) => value;
+
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+
 /// @nodoc
 mixin _$CertificateInfo {
+  String get subject =>
+      throw _privateConstructorUsedError; // Who the certificate belongs to
+  String get issuer =>
+      throw _privateConstructorUsedError; // Who issued the certificate
+  DateTime get validFrom => throw _privateConstructorUsedError;
+  DateTime get validTo => throw _privateConstructorUsedError;
+  String get serialNumber =>
+      throw _privateConstructorUsedError; // Certificate serial number
+  String get commonName =>
+      throw _privateConstructorUsedError; // Common name extracted from subject
+  List<String> get keyUsages =>
+      throw _privateConstructorUsedError; // Key usage and extended key usage
+  bool get isTrusted => throw _privateConstructorUsedError;
 
- String get subject;// Who the certificate belongs to
- String get issuer;// Who issued the certificate
- DateTime get validFrom; DateTime get validTo; String get serialNumber;// Certificate serial number
- String get commonName;// Common name extracted from subject
- List<String> get keyUsages;// Key usage and extended key usage
- bool get isTrusted;
-/// Create a copy of CertificateInfo
-/// with the given fields replaced by the non-null parameter values.
-@JsonKey(includeFromJson: false, includeToJson: false)
-@pragma('vm:prefer-inline')
-$CertificateInfoCopyWith<CertificateInfo> get copyWith => _$CertificateInfoCopyWithImpl<CertificateInfo>(this as CertificateInfo, _$identity);
-
-
-
-@override
-bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is CertificateInfo&&(identical(other.subject, subject) || other.subject == subject)&&(identical(other.issuer, issuer) || other.issuer == issuer)&&(identical(other.validFrom, validFrom) || other.validFrom == validFrom)&&(identical(other.validTo, validTo) || other.validTo == validTo)&&(identical(other.serialNumber, serialNumber) || other.serialNumber == serialNumber)&&(identical(other.commonName, commonName) || other.commonName == commonName)&&const DeepCollectionEquality().equals(other.keyUsages, keyUsages)&&(identical(other.isTrusted, isTrusted) || other.isTrusted == isTrusted));
-}
-
-
-@override
-int get hashCode => Object.hash(runtimeType,subject,issuer,validFrom,validTo,serialNumber,commonName,const DeepCollectionEquality().hash(keyUsages),isTrusted);
-
-@override
-String toString() {
-  return 'CertificateInfo(subject: $subject, issuer: $issuer, validFrom: $validFrom, validTo: $validTo, serialNumber: $serialNumber, commonName: $commonName, keyUsages: $keyUsages, isTrusted: $isTrusted)';
-}
-
-
+  /// Create a copy of CertificateInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $CertificateInfoCopyWith<CertificateInfo> get copyWith =>
+      throw _privateConstructorUsedError;
 }
 
 /// @nodoc
-abstract mixin class $CertificateInfoCopyWith<$Res>  {
-  factory $CertificateInfoCopyWith(CertificateInfo value, $Res Function(CertificateInfo) _then) = _$CertificateInfoCopyWithImpl;
-@useResult
-$Res call({
- String subject, String issuer, DateTime validFrom, DateTime validTo, String serialNumber, String commonName, List<String> keyUsages, bool isTrusted
-});
-
-
-
-
+abstract class $CertificateInfoCopyWith<$Res> {
+  factory $CertificateInfoCopyWith(
+    CertificateInfo value,
+    $Res Function(CertificateInfo) then,
+  ) = _$CertificateInfoCopyWithImpl<$Res, CertificateInfo>;
+  @useResult
+  $Res call({
+    String subject,
+    String issuer,
+    DateTime validFrom,
+    DateTime validTo,
+    String serialNumber,
+    String commonName,
+    List<String> keyUsages,
+    bool isTrusted,
+  });
 }
+
 /// @nodoc
-class _$CertificateInfoCopyWithImpl<$Res>
+class _$CertificateInfoCopyWithImpl<$Res, $Val extends CertificateInfo>
     implements $CertificateInfoCopyWith<$Res> {
-  _$CertificateInfoCopyWithImpl(this._self, this._then);
+  _$CertificateInfoCopyWithImpl(this._value, this._then);
 
-  final CertificateInfo _self;
-  final $Res Function(CertificateInfo) _then;
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
 
-/// Create a copy of CertificateInfo
-/// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? subject = null,Object? issuer = null,Object? validFrom = null,Object? validTo = null,Object? serialNumber = null,Object? commonName = null,Object? keyUsages = null,Object? isTrusted = null,}) {
-  return _then(_self.copyWith(
-subject: null == subject ? _self.subject : subject // ignore: cast_nullable_to_non_nullable
-as String,issuer: null == issuer ? _self.issuer : issuer // ignore: cast_nullable_to_non_nullable
-as String,validFrom: null == validFrom ? _self.validFrom : validFrom // ignore: cast_nullable_to_non_nullable
-as DateTime,validTo: null == validTo ? _self.validTo : validTo // ignore: cast_nullable_to_non_nullable
-as DateTime,serialNumber: null == serialNumber ? _self.serialNumber : serialNumber // ignore: cast_nullable_to_non_nullable
-as String,commonName: null == commonName ? _self.commonName : commonName // ignore: cast_nullable_to_non_nullable
-as String,keyUsages: null == keyUsages ? _self.keyUsages : keyUsages // ignore: cast_nullable_to_non_nullable
-as List<String>,isTrusted: null == isTrusted ? _self.isTrusted : isTrusted // ignore: cast_nullable_to_non_nullable
-as bool,
-  ));
-}
-
-}
-
-
-/// @nodoc
-
-
-class _CertificateInfo implements CertificateInfo {
-  const _CertificateInfo({required this.subject, required this.issuer, required this.validFrom, required this.validTo, this.serialNumber = '', this.commonName = '', final  List<String> keyUsages = const [], this.isTrusted = false}): _keyUsages = keyUsages;
-  
-
-@override final  String subject;
-// Who the certificate belongs to
-@override final  String issuer;
-// Who issued the certificate
-@override final  DateTime validFrom;
-@override final  DateTime validTo;
-@override@JsonKey() final  String serialNumber;
-// Certificate serial number
-@override@JsonKey() final  String commonName;
-// Common name extracted from subject
- final  List<String> _keyUsages;
-// Common name extracted from subject
-@override@JsonKey() List<String> get keyUsages {
-  if (_keyUsages is EqualUnmodifiableListView) return _keyUsages;
-  // ignore: implicit_dynamic_type
-  return EqualUnmodifiableListView(_keyUsages);
-}
-
-// Key usage and extended key usage
-@override@JsonKey() final  bool isTrusted;
-
-/// Create a copy of CertificateInfo
-/// with the given fields replaced by the non-null parameter values.
-@override @JsonKey(includeFromJson: false, includeToJson: false)
-@pragma('vm:prefer-inline')
-_$CertificateInfoCopyWith<_CertificateInfo> get copyWith => __$CertificateInfoCopyWithImpl<_CertificateInfo>(this, _$identity);
-
-
-
-@override
-bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CertificateInfo&&(identical(other.subject, subject) || other.subject == subject)&&(identical(other.issuer, issuer) || other.issuer == issuer)&&(identical(other.validFrom, validFrom) || other.validFrom == validFrom)&&(identical(other.validTo, validTo) || other.validTo == validTo)&&(identical(other.serialNumber, serialNumber) || other.serialNumber == serialNumber)&&(identical(other.commonName, commonName) || other.commonName == commonName)&&const DeepCollectionEquality().equals(other._keyUsages, _keyUsages)&&(identical(other.isTrusted, isTrusted) || other.isTrusted == isTrusted));
-}
-
-
-@override
-int get hashCode => Object.hash(runtimeType,subject,issuer,validFrom,validTo,serialNumber,commonName,const DeepCollectionEquality().hash(_keyUsages),isTrusted);
-
-@override
-String toString() {
-  return 'CertificateInfo(subject: $subject, issuer: $issuer, validFrom: $validFrom, validTo: $validTo, serialNumber: $serialNumber, commonName: $commonName, keyUsages: $keyUsages, isTrusted: $isTrusted)';
-}
-
-
+  /// Create a copy of CertificateInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? subject = null,
+    Object? issuer = null,
+    Object? validFrom = null,
+    Object? validTo = null,
+    Object? serialNumber = null,
+    Object? commonName = null,
+    Object? keyUsages = null,
+    Object? isTrusted = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            subject: null == subject
+                ? _value.subject
+                : subject // ignore: cast_nullable_to_non_nullable
+                      as String,
+            issuer: null == issuer
+                ? _value.issuer
+                : issuer // ignore: cast_nullable_to_non_nullable
+                      as String,
+            validFrom: null == validFrom
+                ? _value.validFrom
+                : validFrom // ignore: cast_nullable_to_non_nullable
+                      as DateTime,
+            validTo: null == validTo
+                ? _value.validTo
+                : validTo // ignore: cast_nullable_to_non_nullable
+                      as DateTime,
+            serialNumber: null == serialNumber
+                ? _value.serialNumber
+                : serialNumber // ignore: cast_nullable_to_non_nullable
+                      as String,
+            commonName: null == commonName
+                ? _value.commonName
+                : commonName // ignore: cast_nullable_to_non_nullable
+                      as String,
+            keyUsages: null == keyUsages
+                ? _value.keyUsages
+                : keyUsages // ignore: cast_nullable_to_non_nullable
+                      as List<String>,
+            isTrusted: null == isTrusted
+                ? _value.isTrusted
+                : isTrusted // ignore: cast_nullable_to_non_nullable
+                      as bool,
+          )
+          as $Val,
+    );
+  }
 }
 
 /// @nodoc
-abstract mixin class _$CertificateInfoCopyWith<$Res> implements $CertificateInfoCopyWith<$Res> {
-  factory _$CertificateInfoCopyWith(_CertificateInfo value, $Res Function(_CertificateInfo) _then) = __$CertificateInfoCopyWithImpl;
-@override @useResult
-$Res call({
- String subject, String issuer, DateTime validFrom, DateTime validTo, String serialNumber, String commonName, List<String> keyUsages, bool isTrusted
-});
-
-
-
-
+abstract class _$$CertificateInfoImplCopyWith<$Res>
+    implements $CertificateInfoCopyWith<$Res> {
+  factory _$$CertificateInfoImplCopyWith(
+    _$CertificateInfoImpl value,
+    $Res Function(_$CertificateInfoImpl) then,
+  ) = __$$CertificateInfoImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String subject,
+    String issuer,
+    DateTime validFrom,
+    DateTime validTo,
+    String serialNumber,
+    String commonName,
+    List<String> keyUsages,
+    bool isTrusted,
+  });
 }
+
 /// @nodoc
-class __$CertificateInfoCopyWithImpl<$Res>
-    implements _$CertificateInfoCopyWith<$Res> {
-  __$CertificateInfoCopyWithImpl(this._self, this._then);
+class __$$CertificateInfoImplCopyWithImpl<$Res>
+    extends _$CertificateInfoCopyWithImpl<$Res, _$CertificateInfoImpl>
+    implements _$$CertificateInfoImplCopyWith<$Res> {
+  __$$CertificateInfoImplCopyWithImpl(
+    _$CertificateInfoImpl _value,
+    $Res Function(_$CertificateInfoImpl) _then,
+  ) : super(_value, _then);
 
-  final _CertificateInfo _self;
-  final $Res Function(_CertificateInfo) _then;
-
-/// Create a copy of CertificateInfo
-/// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? subject = null,Object? issuer = null,Object? validFrom = null,Object? validTo = null,Object? serialNumber = null,Object? commonName = null,Object? keyUsages = null,Object? isTrusted = null,}) {
-  return _then(_CertificateInfo(
-subject: null == subject ? _self.subject : subject // ignore: cast_nullable_to_non_nullable
-as String,issuer: null == issuer ? _self.issuer : issuer // ignore: cast_nullable_to_non_nullable
-as String,validFrom: null == validFrom ? _self.validFrom : validFrom // ignore: cast_nullable_to_non_nullable
-as DateTime,validTo: null == validTo ? _self.validTo : validTo // ignore: cast_nullable_to_non_nullable
-as DateTime,serialNumber: null == serialNumber ? _self.serialNumber : serialNumber // ignore: cast_nullable_to_non_nullable
-as String,commonName: null == commonName ? _self.commonName : commonName // ignore: cast_nullable_to_non_nullable
-as String,keyUsages: null == keyUsages ? _self._keyUsages : keyUsages // ignore: cast_nullable_to_non_nullable
-as List<String>,isTrusted: null == isTrusted ? _self.isTrusted : isTrusted // ignore: cast_nullable_to_non_nullable
-as bool,
-  ));
+  /// Create a copy of CertificateInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? subject = null,
+    Object? issuer = null,
+    Object? validFrom = null,
+    Object? validTo = null,
+    Object? serialNumber = null,
+    Object? commonName = null,
+    Object? keyUsages = null,
+    Object? isTrusted = null,
+  }) {
+    return _then(
+      _$CertificateInfoImpl(
+        subject: null == subject
+            ? _value.subject
+            : subject // ignore: cast_nullable_to_non_nullable
+                  as String,
+        issuer: null == issuer
+            ? _value.issuer
+            : issuer // ignore: cast_nullable_to_non_nullable
+                  as String,
+        validFrom: null == validFrom
+            ? _value.validFrom
+            : validFrom // ignore: cast_nullable_to_non_nullable
+                  as DateTime,
+        validTo: null == validTo
+            ? _value.validTo
+            : validTo // ignore: cast_nullable_to_non_nullable
+                  as DateTime,
+        serialNumber: null == serialNumber
+            ? _value.serialNumber
+            : serialNumber // ignore: cast_nullable_to_non_nullable
+                  as String,
+        commonName: null == commonName
+            ? _value.commonName
+            : commonName // ignore: cast_nullable_to_non_nullable
+                  as String,
+        keyUsages: null == keyUsages
+            ? _value._keyUsages
+            : keyUsages // ignore: cast_nullable_to_non_nullable
+                  as List<String>,
+        isTrusted: null == isTrusted
+            ? _value.isTrusted
+            : isTrusted // ignore: cast_nullable_to_non_nullable
+                  as bool,
+      ),
+    );
+  }
 }
 
+/// @nodoc
 
+class _$CertificateInfoImpl implements _CertificateInfo {
+  const _$CertificateInfoImpl({
+    required this.subject,
+    required this.issuer,
+    required this.validFrom,
+    required this.validTo,
+    this.serialNumber = '',
+    this.commonName = '',
+    final List<String> keyUsages = const [],
+    this.isTrusted = false,
+  }) : _keyUsages = keyUsages;
+
+  @override
+  final String subject;
+  // Who the certificate belongs to
+  @override
+  final String issuer;
+  // Who issued the certificate
+  @override
+  final DateTime validFrom;
+  @override
+  final DateTime validTo;
+  @override
+  @JsonKey()
+  final String serialNumber;
+  // Certificate serial number
+  @override
+  @JsonKey()
+  final String commonName;
+  // Common name extracted from subject
+  final List<String> _keyUsages;
+  // Common name extracted from subject
+  @override
+  @JsonKey()
+  List<String> get keyUsages {
+    if (_keyUsages is EqualUnmodifiableListView) return _keyUsages;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_keyUsages);
+  }
+
+  // Key usage and extended key usage
+  @override
+  @JsonKey()
+  final bool isTrusted;
+
+  @override
+  String toString() {
+    return 'CertificateInfo(subject: $subject, issuer: $issuer, validFrom: $validFrom, validTo: $validTo, serialNumber: $serialNumber, commonName: $commonName, keyUsages: $keyUsages, isTrusted: $isTrusted)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$CertificateInfoImpl &&
+            (identical(other.subject, subject) || other.subject == subject) &&
+            (identical(other.issuer, issuer) || other.issuer == issuer) &&
+            (identical(other.validFrom, validFrom) ||
+                other.validFrom == validFrom) &&
+            (identical(other.validTo, validTo) || other.validTo == validTo) &&
+            (identical(other.serialNumber, serialNumber) ||
+                other.serialNumber == serialNumber) &&
+            (identical(other.commonName, commonName) ||
+                other.commonName == commonName) &&
+            const DeepCollectionEquality().equals(
+              other._keyUsages,
+              _keyUsages,
+            ) &&
+            (identical(other.isTrusted, isTrusted) ||
+                other.isTrusted == isTrusted));
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    subject,
+    issuer,
+    validFrom,
+    validTo,
+    serialNumber,
+    commonName,
+    const DeepCollectionEquality().hash(_keyUsages),
+    isTrusted,
+  );
+
+  /// Create a copy of CertificateInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$CertificateInfoImplCopyWith<_$CertificateInfoImpl> get copyWith =>
+      __$$CertificateInfoImplCopyWithImpl<_$CertificateInfoImpl>(
+        this,
+        _$identity,
+      );
 }
 
-// dart format on
+abstract class _CertificateInfo implements CertificateInfo {
+  const factory _CertificateInfo({
+    required final String subject,
+    required final String issuer,
+    required final DateTime validFrom,
+    required final DateTime validTo,
+    final String serialNumber,
+    final String commonName,
+    final List<String> keyUsages,
+    final bool isTrusted,
+  }) = _$CertificateInfoImpl;
+
+  @override
+  String get subject; // Who the certificate belongs to
+  @override
+  String get issuer; // Who issued the certificate
+  @override
+  DateTime get validFrom;
+  @override
+  DateTime get validTo;
+  @override
+  String get serialNumber; // Certificate serial number
+  @override
+  String get commonName; // Common name extracted from subject
+  @override
+  List<String> get keyUsages; // Key usage and extended key usage
+  @override
+  bool get isTrusted;
+
+  /// Create a copy of CertificateInfo
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$CertificateInfoImplCopyWith<_$CertificateInfoImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
