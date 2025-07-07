@@ -29,21 +29,70 @@ class CertificateUploadNotifier extends StateNotifier<CertificateUploadState> {
       : super(const CertificateUploadState());
 
   Future<String> copyP12ToAppDir(PlatformFile file) async {
-    final appDir = await getApplicationDocumentsDirectory();
-    final newPath = '${appDir.path}/${file.name}';
-    final newFile = File(newPath);
-    await newFile.writeAsBytes(await File(file.path!).readAsBytes());
-    return newPath;
+    try {
+      if (file.path == null) {
+        throw Exception('Ruta del archivo no disponible');
+      }
+      
+      final appDir = await getApplicationDocumentsDirectory();
+      final sanitizedName = file.name.replaceAll(RegExp(r'[^\w\-_\.]'), '_');
+      final newPath = '${appDir.path}/$sanitizedName';
+      final sourceFile = File(file.path!);
+      
+      // Verify source file exists and is readable
+      if (!await sourceFile.exists()) {
+        throw Exception('El archivo seleccionado no existe o no es accesible');
+      }
+      
+      final newFile = File(newPath);
+      
+      // Copy file safely
+      await sourceFile.copy(newPath);
+      
+      // Verify copy was successful
+      if (!await newFile.exists()) {
+        throw Exception('Error al copiar el archivo');
+      }
+      
+      return newPath;
+    } catch (e) {
+      throw Exception('Error al procesar archivo: ${e.toString()}');
+    }
   }
 
   Future<void> pickFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['p12'],
-    );
+    try {
+      // Clear any previous errors
+      state = state.copyWith(error: null);
+      
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['p12'],
+        allowMultiple: false,
+        withData: false, // Important: don't load file data immediately
+        withReadStream: false,
+      );
 
-    if (result != null) {
-      state = state.copyWith(file: result.files.single, error: null);
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.single;
+        
+        // Validate file
+        if (file.path == null) {
+          state = state.copyWith(error: 'Error: No se pudo acceder al archivo seleccionado.');
+          return;
+        }
+        
+        if (!file.name.toLowerCase().endsWith('.p12')) {
+          state = state.copyWith(error: 'Error: Por favor selecciona un archivo .p12 válido.');
+          return;
+        }
+        
+        state = state.copyWith(file: file, error: null);
+      }
+    } catch (e) {
+      state = state.copyWith(
+        error: 'Error al seleccionar archivo: ${e.toString()}',
+      );
     }
   }
 
