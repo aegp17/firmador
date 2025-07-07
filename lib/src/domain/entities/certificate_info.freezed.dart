@@ -1,0 +1,180 @@
+// dart format width=80
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+
+part of 'certificate_info.dart';
+
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+
+// dart format off
+T _$identity<T>(T value) => value;
+/// @nodoc
+mixin _$CertificateInfo {
+
+ String get subject;// Who the certificate belongs to
+ String get issuer;// Who issued the certificate
+ DateTime get validFrom; DateTime get validTo; String get serialNumber;// Certificate serial number
+ String get commonName;// Common name extracted from subject
+ List<String> get keyUsages;// Key usage and extended key usage
+ bool get isTrusted;
+/// Create a copy of CertificateInfo
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$CertificateInfoCopyWith<CertificateInfo> get copyWith => _$CertificateInfoCopyWithImpl<CertificateInfo>(this as CertificateInfo, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CertificateInfo&&(identical(other.subject, subject) || other.subject == subject)&&(identical(other.issuer, issuer) || other.issuer == issuer)&&(identical(other.validFrom, validFrom) || other.validFrom == validFrom)&&(identical(other.validTo, validTo) || other.validTo == validTo)&&(identical(other.serialNumber, serialNumber) || other.serialNumber == serialNumber)&&(identical(other.commonName, commonName) || other.commonName == commonName)&&const DeepCollectionEquality().equals(other.keyUsages, keyUsages)&&(identical(other.isTrusted, isTrusted) || other.isTrusted == isTrusted));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,subject,issuer,validFrom,validTo,serialNumber,commonName,const DeepCollectionEquality().hash(keyUsages),isTrusted);
+
+@override
+String toString() {
+  return 'CertificateInfo(subject: $subject, issuer: $issuer, validFrom: $validFrom, validTo: $validTo, serialNumber: $serialNumber, commonName: $commonName, keyUsages: $keyUsages, isTrusted: $isTrusted)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $CertificateInfoCopyWith<$Res>  {
+  factory $CertificateInfoCopyWith(CertificateInfo value, $Res Function(CertificateInfo) _then) = _$CertificateInfoCopyWithImpl;
+@useResult
+$Res call({
+ String subject, String issuer, DateTime validFrom, DateTime validTo, String serialNumber, String commonName, List<String> keyUsages, bool isTrusted
+});
+
+
+
+
+}
+/// @nodoc
+class _$CertificateInfoCopyWithImpl<$Res>
+    implements $CertificateInfoCopyWith<$Res> {
+  _$CertificateInfoCopyWithImpl(this._self, this._then);
+
+  final CertificateInfo _self;
+  final $Res Function(CertificateInfo) _then;
+
+/// Create a copy of CertificateInfo
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? subject = null,Object? issuer = null,Object? validFrom = null,Object? validTo = null,Object? serialNumber = null,Object? commonName = null,Object? keyUsages = null,Object? isTrusted = null,}) {
+  return _then(_self.copyWith(
+subject: null == subject ? _self.subject : subject // ignore: cast_nullable_to_non_nullable
+as String,issuer: null == issuer ? _self.issuer : issuer // ignore: cast_nullable_to_non_nullable
+as String,validFrom: null == validFrom ? _self.validFrom : validFrom // ignore: cast_nullable_to_non_nullable
+as DateTime,validTo: null == validTo ? _self.validTo : validTo // ignore: cast_nullable_to_non_nullable
+as DateTime,serialNumber: null == serialNumber ? _self.serialNumber : serialNumber // ignore: cast_nullable_to_non_nullable
+as String,commonName: null == commonName ? _self.commonName : commonName // ignore: cast_nullable_to_non_nullable
+as String,keyUsages: null == keyUsages ? _self.keyUsages : keyUsages // ignore: cast_nullable_to_non_nullable
+as List<String>,isTrusted: null == isTrusted ? _self.isTrusted : isTrusted // ignore: cast_nullable_to_non_nullable
+as bool,
+  ));
+}
+
+}
+
+
+/// @nodoc
+
+
+class _CertificateInfo implements CertificateInfo {
+  const _CertificateInfo({required this.subject, required this.issuer, required this.validFrom, required this.validTo, this.serialNumber = '', this.commonName = '', final  List<String> keyUsages = const [], this.isTrusted = false}): _keyUsages = keyUsages;
+  
+
+@override final  String subject;
+// Who the certificate belongs to
+@override final  String issuer;
+// Who issued the certificate
+@override final  DateTime validFrom;
+@override final  DateTime validTo;
+@override@JsonKey() final  String serialNumber;
+// Certificate serial number
+@override@JsonKey() final  String commonName;
+// Common name extracted from subject
+ final  List<String> _keyUsages;
+// Common name extracted from subject
+@override@JsonKey() List<String> get keyUsages {
+  if (_keyUsages is EqualUnmodifiableListView) return _keyUsages;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_keyUsages);
+}
+
+// Key usage and extended key usage
+@override@JsonKey() final  bool isTrusted;
+
+/// Create a copy of CertificateInfo
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$CertificateInfoCopyWith<_CertificateInfo> get copyWith => __$CertificateInfoCopyWithImpl<_CertificateInfo>(this, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CertificateInfo&&(identical(other.subject, subject) || other.subject == subject)&&(identical(other.issuer, issuer) || other.issuer == issuer)&&(identical(other.validFrom, validFrom) || other.validFrom == validFrom)&&(identical(other.validTo, validTo) || other.validTo == validTo)&&(identical(other.serialNumber, serialNumber) || other.serialNumber == serialNumber)&&(identical(other.commonName, commonName) || other.commonName == commonName)&&const DeepCollectionEquality().equals(other._keyUsages, _keyUsages)&&(identical(other.isTrusted, isTrusted) || other.isTrusted == isTrusted));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,subject,issuer,validFrom,validTo,serialNumber,commonName,const DeepCollectionEquality().hash(_keyUsages),isTrusted);
+
+@override
+String toString() {
+  return 'CertificateInfo(subject: $subject, issuer: $issuer, validFrom: $validFrom, validTo: $validTo, serialNumber: $serialNumber, commonName: $commonName, keyUsages: $keyUsages, isTrusted: $isTrusted)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$CertificateInfoCopyWith<$Res> implements $CertificateInfoCopyWith<$Res> {
+  factory _$CertificateInfoCopyWith(_CertificateInfo value, $Res Function(_CertificateInfo) _then) = __$CertificateInfoCopyWithImpl;
+@override @useResult
+$Res call({
+ String subject, String issuer, DateTime validFrom, DateTime validTo, String serialNumber, String commonName, List<String> keyUsages, bool isTrusted
+});
+
+
+
+
+}
+/// @nodoc
+class __$CertificateInfoCopyWithImpl<$Res>
+    implements _$CertificateInfoCopyWith<$Res> {
+  __$CertificateInfoCopyWithImpl(this._self, this._then);
+
+  final _CertificateInfo _self;
+  final $Res Function(_CertificateInfo) _then;
+
+/// Create a copy of CertificateInfo
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? subject = null,Object? issuer = null,Object? validFrom = null,Object? validTo = null,Object? serialNumber = null,Object? commonName = null,Object? keyUsages = null,Object? isTrusted = null,}) {
+  return _then(_CertificateInfo(
+subject: null == subject ? _self.subject : subject // ignore: cast_nullable_to_non_nullable
+as String,issuer: null == issuer ? _self.issuer : issuer // ignore: cast_nullable_to_non_nullable
+as String,validFrom: null == validFrom ? _self.validFrom : validFrom // ignore: cast_nullable_to_non_nullable
+as DateTime,validTo: null == validTo ? _self.validTo : validTo // ignore: cast_nullable_to_non_nullable
+as DateTime,serialNumber: null == serialNumber ? _self.serialNumber : serialNumber // ignore: cast_nullable_to_non_nullable
+as String,commonName: null == commonName ? _self.commonName : commonName // ignore: cast_nullable_to_non_nullable
+as String,keyUsages: null == keyUsages ? _self._keyUsages : keyUsages // ignore: cast_nullable_to_non_nullable
+as List<String>,isTrusted: null == isTrusted ? _self.isTrusted : isTrusted // ignore: cast_nullable_to_non_nullable
+as bool,
+  ));
+}
+
+
+}
+
+// dart format on
