@@ -1,7 +1,6 @@
 import 'package:firmador/src/presentation/screens/certificate_upload_screen.dart';
 import 'package:firmador/src/presentation/theme/app_theme.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -28,44 +27,16 @@ class WelcomeScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(20.0),
                 child: Column(
                   children: <Widget>[
-                    // Header with Exit Button
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const SizedBox(width: 40), // Balance spacing
-                        const Text(
-                          'FirmaSeguraEC',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.white,
-                          ),
+                    // Header
+                    const Center(
+                      child: Text(
+                        'FirmaSeguraEC',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.white,
                         ),
-                        // Exit Button
-                        Container(
-                          decoration: BoxDecoration(
-                            color: AppTheme.white.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: AppTheme.white.withValues(alpha: 0.2),
-                              width: 1,
-                            ),
-                          ),
-                          child: IconButton(
-                            onPressed: () => _showExitDialog(context),
-                            icon: const Icon(
-                              Icons.close,
-                              color: AppTheme.white,
-                              size: 20,
-                            ),
-                            padding: const EdgeInsets.all(8),
-                            constraints: const BoxConstraints(
-                              minWidth: 40,
-                              minHeight: 40,
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                     
                     SizedBox(height: isSmallScreen ? 20 : 40),
@@ -249,69 +220,7 @@ class WelcomeScreen extends StatelessWidget {
     );
   }
 
-  void _showExitDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: AppTheme.darkNavy,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(
-              color: AppTheme.primaryCyan.withValues(alpha: 0.3),
-              width: 1,
-            ),
-          ),
-          title: const Text(
-            '¿Ir a la pantalla de inicio?',
-            style: TextStyle(
-              color: AppTheme.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          content: const Text(
-            'La aplicación se enviará al fondo y podrás volver a ella desde la pantalla de inicio.',
-            style: TextStyle(
-              color: AppTheme.white,
-              fontSize: 14,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: TextButton.styleFrom(
-                foregroundColor: AppTheme.white.withValues(alpha: 0.7),
-              ),
-              child: const Text('Cancelar'),
-            ),
-            Container(
-              decoration: BoxDecoration(
-                gradient: AppGradients.primaryGradient,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _goToHomeScreen();
-                },
-                style: TextButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  foregroundColor: AppTheme.white,
-                ),
-                child: const Text('Ir a Inicio'),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
-  void _goToHomeScreen() {
-    // Envía la app al fondo para ir a la pantalla de inicio
-    SystemNavigator.pop();
-  }
 }
 
 class _FeatureTile extends StatelessWidget {
