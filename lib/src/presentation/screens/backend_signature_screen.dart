@@ -43,10 +43,35 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
     super.initState();
     _loadUserPreferences();
     _startHealthCheckTimer();
+    _addFieldListeners();
+  }
+
+  void _addFieldListeners() {
+    // Add listeners to required fields to update button state
+    _locationController.addListener(_updateButtonState);
+    _reasonController.addListener(_updateButtonState);
+    _passwordController.addListener(_updateButtonState);
+  }
+
+  void _updateButtonState() {
+    setState(() {
+      // This will trigger a rebuild and update the button state
+    });
+  }
+
+  bool _validateRequiredFields() {
+    // Required fields validation (without form validation)
+    return _locationController.text.trim().isNotEmpty &&
+           _reasonController.text.trim().isNotEmpty;
   }
 
   @override
   void dispose() {
+    // Remove listeners before disposing
+    _locationController.removeListener(_updateButtonState);
+    _reasonController.removeListener(_updateButtonState);
+    _passwordController.removeListener(_updateButtonState);
+    
     _passwordController.dispose();
     _signerNameController.dispose();
     _signerIdController.dispose();
@@ -613,15 +638,10 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
             TextFormField(
               controller: _signerIdController,
               decoration: const InputDecoration(
-                labelText: 'Cédula/RUC',
+                labelText: 'Cédula/RUC (opcional)',
                 border: OutlineInputBorder(),
               ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Por favor ingrese la cédula o RUC';
-                }
-                return null;
-              },
+              // Campo opcional - sin validator
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -698,15 +718,17 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
                     _signaturePosition != null &&
                     _isCertificateValid &&
                     _passwordController.text.isNotEmpty &&
+                    _validateRequiredFields() &&
                     isBackendHealthy;
 
     return ElevatedButton(
       onPressed: canSign ? _signDocument : null,
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppTheme.primaryCyan,
+        backgroundColor: canSign ? AppTheme.primaryCyan : AppTheme.mediumGrey,
         foregroundColor: AppTheme.white,
         padding: const EdgeInsets.symmetric(vertical: 16),
         minimumSize: const Size(double.infinity, 0),
+        elevation: canSign ? 2 : 0,
       ),
       child: _isLoading
           ? const Row(
@@ -846,13 +868,37 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
   }
 
   Future<void> _signDocument() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Validate all conditions before signing
+    if (!_validateRequiredFields()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Por favor complete todos los campos obligatorios'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+      return;
+    }
+    
     if (_selectedDocument == null || _selectedCertificate == null) return;
     if (_signaturePosition == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Por favor seleccione la posición de la firma'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (!_isCertificateValid) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('El certificado no es válido o la contraseña es incorrecta'),
             backgroundColor: AppTheme.error,
           ),
         );
