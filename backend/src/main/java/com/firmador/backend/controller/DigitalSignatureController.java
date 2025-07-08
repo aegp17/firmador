@@ -32,14 +32,13 @@ public class DigitalSignatureController {
 
     @PostMapping(value = "/sign", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<SignatureResponse> signDocument(
-            @RequestParam("document") MultipartFile document,
+            @RequestParam("file") MultipartFile document,
             @RequestParam("certificate") MultipartFile certificate,
-            @RequestParam("signerName") String signerName,
-            @RequestParam("signerEmail") String signerEmail,
+            @RequestParam(value = "signerName", required = false) String signerName,
             @RequestParam("signerId") String signerId,
             @RequestParam("location") String location,
             @RequestParam("reason") String reason,
-            @RequestParam("certificatePassword") String certificatePassword,
+            @RequestParam("password") String certificatePassword,
             @RequestParam(value = "signatureX", defaultValue = "100") Integer signatureX,
             @RequestParam(value = "signatureY", defaultValue = "100") Integer signatureY,
             @RequestParam(value = "signatureWidth", defaultValue = "200") Integer signatureWidth,
@@ -58,10 +57,21 @@ public class DigitalSignatureController {
                     .body(new SignatureResponse(false, "El certificado debe ser un archivo .p12 o .pfx"));
             }
 
+            // Extract signer name from certificate if not provided
+            String finalSignerName = signerName;
+            if (finalSignerName == null || finalSignerName.trim().isEmpty()) {
+                try {
+                    CertificateInfo certInfo = digitalSignatureService.extractCertificateInfo(
+                        certificate.getBytes(), certificatePassword);
+                    finalSignerName = certInfo.getCommonName();
+                } catch (Exception e) {
+                    finalSignerName = "Firmante Digital";
+                }
+            }
+
             // Create signature request
             SignatureRequest signatureRequest = new SignatureRequest();
-            signatureRequest.setSignerName(signerName);
-            signatureRequest.setSignerEmail(signerEmail);
+            signatureRequest.setSignerName(finalSignerName);
             signatureRequest.setSignerId(signerId);
             signatureRequest.setLocation(location);
             signatureRequest.setReason(reason);

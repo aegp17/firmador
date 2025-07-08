@@ -1,42 +1,61 @@
 #!/bin/bash
-# 🤖 Fix macOS build script for firmador app
+# 🤖 Fix macOS/iOS build script for firmador app
 # This script fixes common build issues after flutter clean
 
-echo "🔧 Fixing macOS build issues..."
+echo "🔧 Fixing macOS/iOS build issues..."
 
-# 1. Create ephemeral directory
-mkdir -p macos/Flutter/ephemeral
+# Clean Flutter
+echo "[STEP] Cleaning Flutter project..."
+flutter clean
 
-# 2. Create FlutterInputs.xcfilelist
-cat > macos/Flutter/ephemeral/FlutterInputs.xcfilelist << 'EOF'
-${FLUTTER_ROOT}/packages/flutter_tools/bin/macos_assemble.sh
-${PROJECT_DIR}/Flutter/ephemeral/flutter_export_environment.sh
-${PROJECT_DIR}/Flutter/ephemeral/Flutter-Generated.xcconfig
-${PROJECT_DIR}/macos/Flutter/GeneratedPluginRegistrant.swift
-${PROJECT_DIR}/lib/main.dart
-EOF
+# Clean iOS pods
+echo "[STEP] Cleaning iOS pods..."
+cd ios
+rm -rf Pods/
+rm -f Podfile.lock
+cd ..
 
-# 3. Create FlutterOutputs.xcfilelist
-cat > macos/Flutter/ephemeral/FlutterOutputs.xcfilelist << 'EOF'
-${TARGET_BUILD_DIR}/${WRAPPER_NAME}/Contents/Frameworks/FlutterMacOS.framework
-${TARGET_BUILD_DIR}/${WRAPPER_NAME}/Contents/Resources/flutter_assets
-${TARGET_BUILD_DIR}/${WRAPPER_NAME}/Contents/Resources/app.so
-EOF
+# Clean macOS pods
+echo "[STEP] Cleaning macOS pods..."
+cd macos
+rm -rf Pods/
+rm -f Podfile.lock
+cd ..
 
-# 4. Clean problematic files
-echo "🧹 Cleaning problematic files..."
-find build -name "*.DS_Store" -delete 2>/dev/null || true
-find build -name "._*" -delete 2>/dev/null || true
-find build -name "*.app" -exec xattr -cr {} \; 2>/dev/null || true
-
-# 5. Regenerate Flutter files
-echo "📦 Running flutter pub get..."
+# Get Flutter dependencies
+echo "[STEP] Getting Flutter dependencies..."
 flutter pub get
 
-# 6. Reinstall CocoaPods
-echo "☕ Installing CocoaPods..."
-cd macos && pod install && cd ..
+# Reinstall iOS pods
+echo "[STEP] Reinstalling iOS pods..."
+cd ios
+pod install --clean-install
+cd ..
 
-echo "✅ macOS build fix completed!"
-echo "Now you can run: flutter build macos --debug"
-echo "Or build directly with Xcode in the macos directory" 
+# Reinstall macOS pods
+echo "[STEP] Reinstalling macOS pods..."
+cd macos
+pod install --clean-install
+cd ..
+
+# Clean build directories
+echo "[STEP] Cleaning build directories..."
+rm -rf build/
+rm -rf ios/build/
+rm -rf macos/build/
+
+# Run flutter precache
+echo "[STEP] Running flutter precache..."
+flutter precache --ios --macos
+
+echo "✅ Build fix completed!"
+echo ""
+echo "📱 To run on iOS simulator:"
+echo "   1. Open ios/Runner.xcworkspace in Xcode"
+echo "   2. Select your target simulator"
+echo "   3. Press Run (⌘+R)"
+echo ""
+echo "💻 To run on macOS:"
+echo "   1. Open macos/Runner.xcworkspace in Xcode"
+echo "   2. Select 'My Mac' as target"
+echo "   3. Press Run (⌘+R)" 

@@ -21,6 +21,7 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
   File? _selectedDocument;
   File? _selectedCertificate;
   SignaturePosition? _signaturePosition;
+  CertificateInfo? _certificateInfo;
   
   final _formKey = GlobalKey<FormState>();
   final _passwordController = TextEditingController();
@@ -32,6 +33,8 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _rememberData = false;
+  bool _isValidatingCertificate = false;
+  bool _isCertificateValid = false;
   Timer? _healthCheckTimer;
 
   @override
@@ -127,6 +130,10 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
                         if (_selectedCertificate != null) ...[
                           _buildCertificatePasswordCard(),
                           const SizedBox(height: 20),
+                          if (_isCertificateValid && _certificateInfo != null) ...[
+                            _buildCertificateInfoCard(),
+                            const SizedBox(height: 20),
+                          ],
                           _buildSignerInfoCard(),
                           const SizedBox(height: 20),
                           _buildRememberDataCard(),
@@ -256,7 +263,7 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
                         data: (isHealthy) => isHealthy 
                             ? AppTheme.success 
                             : AppTheme.error,
-                        loading: () => AppTheme.textSecondary,
+                        loading: () => AppTheme.mediumGrey,
                         error: (_, __) => AppTheme.error,
                       ),
                     ),
@@ -328,38 +335,20 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _previewDocument(),
-                      icon: const Icon(Icons.preview),
-                      label: const Text('Previsualizar'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.accent,
-                        foregroundColor: AppTheme.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _selectSignaturePosition(),
-                      icon: const Icon(Icons.touch_app),
-                      label: Text(_signaturePosition != null 
-                          ? 'Posición OK' 
-                          : 'Seleccionar Posición'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _signaturePosition != null 
-                            ? AppTheme.success 
-                            : AppTheme.primaryNavy,
-                        foregroundColor: AppTheme.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                ],
+              ElevatedButton.icon(
+                onPressed: () => _selectSignaturePosition(),
+                icon: Icon(_signaturePosition != null ? Icons.check_circle : Icons.touch_app),
+                label: Text(_signaturePosition != null 
+                    ? 'Posición Seleccionada' 
+                    : 'Seleccionar Posición de Firma'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _signaturePosition != null 
+                      ? AppTheme.success 
+                      : AppTheme.primaryNavy,
+                  foregroundColor: AppTheme.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  minimumSize: const Size(double.infinity, 0),
+                ),
               ),
             ] else ...[
               ElevatedButton.icon(
@@ -367,7 +356,7 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
                 icon: const Icon(Icons.upload_file),
                 label: const Text('Seleccionar Documento PDF'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accent,
+                  backgroundColor: AppTheme.primaryCyan,
                   foregroundColor: AppTheme.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   minimumSize: const Size(double.infinity, 0),
@@ -471,20 +460,48 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
               decoration: InputDecoration(
                 labelText: 'Contraseña',
                 border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _obscurePassword = !_obscurePassword;
-                    });
-                  },
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_isValidatingCertificate)
+                      const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else if (_isCertificateValid)
+                      const Icon(Icons.check_circle, color: AppTheme.success)
+                    else if (_passwordController.text.isNotEmpty)
+                      const Icon(Icons.error, color: AppTheme.error),
+                    IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
+                  ],
                 ),
               ),
+              onChanged: (value) {
+                if (value.isNotEmpty && _selectedCertificate != null) {
+                  // Validate certificate after a short delay
+                  Future.delayed(const Duration(milliseconds: 500), () {
+                    if (_passwordController.text == value) {
+                      _validateCertificate();
+                    }
+                  });
+                }
+              },
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Por favor ingrese la contraseña del certificado';
+                }
+                if (!_isCertificateValid && value.isNotEmpty) {
+                  return 'Contraseña incorrecta o certificado inválido';
                 }
                 return null;
               },
@@ -493,6 +510,87 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
         ),
       ),
     );
+  }
+
+  Widget _buildCertificateInfoCard() {
+    if (_certificateInfo == null) return Container();
+    
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.verified_user, color: AppTheme.success),
+                const SizedBox(width: 8),
+                const Text(
+                  'Información del Certificado',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildInfoRow('Titular', _certificateInfo!.commonName),
+            _buildInfoRow('Emisor', _certificateInfo!.issuer),
+            _buildInfoRow('Válido desde', _formatDate(_certificateInfo!.validFrom)),
+            _buildInfoRow('Válido hasta', _formatDate(_certificateInfo!.validTo)),
+            _buildInfoRow('Número de serie', _certificateInfo!.serialNumber),
+            if (_certificateInfo!.keyUsages.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Usos del certificado:',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: _certificateInfo!.keyUsages.map((usage) => 
+                  Chip(
+                    label: Text(usage, style: const TextStyle(fontSize: 12)),
+                    backgroundColor: AppTheme.primaryCyan.withValues(alpha: 0.1),
+                  ),
+                ).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              '$label:',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   Widget _buildSignerInfoCard() {
@@ -504,25 +602,11 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Información del Firmante',
+              'Información de la Firma',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _signerNameController,
-              decoration: const InputDecoration(
-                labelText: 'Nombre Completo',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Por favor ingrese el nombre del firmante';
-                }
-                return null;
-              },
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -607,14 +691,18 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
       orElse: () => false,
     );
 
+    final canSign = !_isLoading && 
+                    _selectedDocument != null && 
+                    _selectedCertificate != null && 
+                    _signaturePosition != null &&
+                    _isCertificateValid &&
+                    _passwordController.text.isNotEmpty &&
+                    isBackendHealthy;
+
     return ElevatedButton(
-      onPressed: (!_isLoading && 
-                  _selectedDocument != null && 
-                  _selectedCertificate != null && 
-                  _signaturePosition != null &&
-                  isBackendHealthy) ? _signDocument : null,
+      onPressed: canSign ? _signDocument : null,
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppTheme.accent,
+        backgroundColor: AppTheme.primaryCyan,
         foregroundColor: AppTheme.white,
         padding: const EdgeInsets.symmetric(vertical: 16),
         minimumSize: const Size(double.infinity, 0),
@@ -669,25 +757,70 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
       setState(() {
         _selectedCertificate = File(result.files.single.path!);
         _passwordController.clear();
+        _certificateInfo = null;
+        _isCertificateValid = false;
       });
     }
   }
 
-  Future<void> _previewDocument() async {
-    if (_selectedDocument == null) return;
+  Future<void> _validateCertificate() async {
+    if (_selectedCertificate == null || _passwordController.text.isEmpty) {
+      return;
+    }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PdfPreviewScreen(
-          pdfFile: _selectedDocument!,
-          onPositionSelected: (position) {
-            // This is just for preview, don't set position
-          },
+    setState(() {
+      _isValidatingCertificate = true;
+    });
+
+    try {
+      final backendService = BackendSignatureService();
+      final result = await backendService.getCertificateInfo(
+        certificateFile: _selectedCertificate!,
+        password: _passwordController.text,
+      );
+
+      setState(() {
+        _isValidatingCertificate = false;
+        _isCertificateValid = result.success;
+        _certificateInfo = result.certificateInfo;
+        
+        // Auto-fill signer name and ID if available
+        if (result.success && result.certificateInfo != null) {
+          _signerNameController.text = result.certificateInfo!.commonName;
+          // Extract email from subject if available
+          final subject = result.certificateInfo!.subject;
+          final emailMatch = RegExp(r'emailAddress=([^,]+)').firstMatch(subject);
+          if (emailMatch != null) {
+            // Could be used for email field if needed
+          }
+        }
+      });
+
+      if (!result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al validar certificado: ${result.message}'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isValidatingCertificate = false;
+        _isCertificateValid = false;
+        _certificateInfo = null;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al validar certificado: $e'),
+          backgroundColor: AppTheme.error,
         ),
-      ),
-    );
+      );
+    }
   }
+
+
 
   Future<void> _selectSignaturePosition() async {
     if (_selectedDocument == null) return;
@@ -733,7 +866,7 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
       final result = await backendService.signDocument(
         documentFile: _selectedDocument!,
         certificateFile: _selectedCertificate!,
-        signerName: _signerNameController.text,
+        signerName: _certificateInfo?.commonName ?? 'Firmante',
         signerId: _signerIdController.text,
         location: _locationController.text,
         reason: _reasonController.text,
@@ -777,7 +910,7 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
             Text('El documento ha sido firmado exitosamente.'),
             const SizedBox(height: 8),
             Text('Archivo: ${result.filename}'),
-            Text('Tamaño: ${(result.fileSize / 1024 / 1024).toStringAsFixed(2)} MB'),
+            Text('Tamaño: ${result.fileSize != null ? (result.fileSize! / 1024 / 1024).toStringAsFixed(2) : 'N/A'} MB'),
             Text('Firmado: ${result.signedAt.toString().split('.')[0]}'),
           ],
         ),
@@ -790,7 +923,7 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
             ElevatedButton(
               onPressed: () => _downloadDocument(result.downloadUrl!),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.accent,
+                backgroundColor: AppTheme.primaryCyan,
                 foregroundColor: AppTheme.white,
               ),
               child: const Text('Descargar PDF'),

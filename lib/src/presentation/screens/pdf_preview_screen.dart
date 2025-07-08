@@ -145,16 +145,16 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
                           width: 50,
                           height: 50,
                           decoration: BoxDecoration(
-                            color: AppTheme.accent.withValues(alpha: 0.3),
+                            color: AppTheme.primaryCyan.withValues(alpha: 0.3),
                             border: Border.all(
-                              color: AppTheme.accent,
+                              color: AppTheme.primaryCyan,
                               width: 2,
                             ),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Icon(
                             Icons.draw,
-                            color: AppTheme.accent,
+                            color: AppTheme.primaryCyan,
                             size: 24,
                           ),
                         ),
@@ -225,7 +225,7 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
                               }
                             : null,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.accent,
+                          backgroundColor: AppTheme.primaryCyan,
                           foregroundColor: AppTheme.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
