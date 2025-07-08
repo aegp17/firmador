@@ -1,4 +1,5 @@
 import 'package:firmador/src/presentation/screens/certificate_upload_screen.dart';
+import 'package:firmador/src/presentation/screens/backend_signature_screen.dart';
 import 'package:firmador/src/presentation/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
@@ -127,7 +128,7 @@ class WelcomeScreen extends StatelessWidget {
                     // CTA Section
                     Column(
                       children: [
-                        // Main CTA Button
+                        // Backend Mode Button (Recommended)
                         Container(
                           width: double.infinity,
                           decoration: BoxDecoration(
@@ -140,6 +141,63 @@ class WelcomeScreen extends StatelessWidget {
                                 offset: const Offset(0, 8),
                               ),
                             ],
+                          ),
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => const BackendSignatureScreen(),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              padding: EdgeInsets.symmetric(
+                                vertical: isSmallScreen ? 16 : 20,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            icon: const Icon(
+                              Icons.cloud,
+                              color: AppTheme.white,
+                              size: 24,
+                            ),
+                            label: Column(
+                              children: [
+                                Text(
+                                  'Firmar con Servidor',
+                                  style: TextStyle(
+                                    color: AppTheme.white,
+                                    fontSize: isSmallScreen ? 16 : 18,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  'Recomendado para iOS',
+                                  style: TextStyle(
+                                    color: AppTheme.white.withValues(alpha: 0.8),
+                                    fontSize: isSmallScreen ? 12 : 14,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: isSmallScreen ? 12 : 16),
+                        // Local Mode Button
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: AppTheme.white.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: AppTheme.primaryCyan.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
                           ),
                           child: ElevatedButton.icon(
                             onPressed: () {
@@ -160,17 +218,29 @@ class WelcomeScreen extends StatelessWidget {
                               ),
                             ),
                             icon: const Icon(
-                              Icons.arrow_forward_rounded,
+                              Icons.phone_android,
                               color: AppTheme.white,
                               size: 24,
                             ),
-                            label: Text(
-                              'Comenzar a Firmar',
-                              style: TextStyle(
-                                color: AppTheme.white,
-                                fontSize: isSmallScreen ? 16 : 18,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            label: Column(
+                              children: [
+                                Text(
+                                  'Firmar Localmente',
+                                  style: TextStyle(
+                                    color: AppTheme.white,
+                                    fontSize: isSmallScreen ? 16 : 18,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  'Solo disponible en Android',
+                                  style: TextStyle(
+                                    color: AppTheme.white.withValues(alpha: 0.8),
+                                    fontSize: isSmallScreen ? 12 : 14,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),

@@ -1,0 +1,51 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+  max-http-header-size: 8KB
+
+spring:
+  application:
+    name: firmador-backend
+  
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 60MB
+      enabled: true
+      location: ${java.io.tmpdir}
+  
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    time-zone: America/Guayaquil
+
+logging:
+  level:
+    com.firmador: DEBUG
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# Custom application properties
+firmador:
+  storage:
+    path: ${java.io.tmpdir}/firmador-storage
+  signature:
+    default-location: "Ecuador"
+    default-reason: "Firma digital realizada con Firmador App"
+  security:
+    max-file-size-mb: 50
+    allowed-file-types: pdf
+    allowed-certificate-types: p12,pfx,pkcs12 
