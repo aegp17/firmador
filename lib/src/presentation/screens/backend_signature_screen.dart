@@ -525,12 +525,11 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
                 _updateButtonState();
               },
               validator: (value) {
+                // Solo validar campo vacío cuando se valide el formulario completo
                 if (value == null || value.isEmpty) {
                   return 'Por favor ingrese la contraseña del certificado';
                 }
-                if (!_isCertificateValid && value.isNotEmpty) {
-                  return 'Contraseña incorrecta o certificado inválido';
-                }
+                // No mostrar mensaje de contraseña incorrecta aquí - solo usar indicador visual
                 return null;
               },
             ),

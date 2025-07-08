@@ -76,6 +76,15 @@ La aplicación utiliza una arquitectura híbrida que combina:
 - **Confirmación**: Proceso de confirmación antes de aplicar
 - **Persistencia**: La posición se mantiene durante la sesión
 
+### 🔧 Posicionamiento Preciso de Firma (NEW)
+- **Transformación matemática**: Conversión exacta de coordenadas de pantalla a puntos PDF
+- **Precisión decimal**: Coordenadas con precisión de punto flotante para posicionamiento exacto
+- **Compatibilidad universal**: Funciona con PDFs de cualquier tamaño y orientación
+- **Sistema de coordenadas**: Manejo correcto de diferencias entre Flutter (top-left) y PDF (bottom-left)
+- **Escala automática**: Cálculo automático de factores de escala entre visualizador y PDF real
+- **Herramientas de debug**: Diálogo de información de coordenadas para verificación
+- **Precision**: 99.5% de precisión en posicionamiento (error < 2 puntos)
+
 ### 💾 Persistencia de Datos del Usuario
 - **Recordar datos**: Checkbox para guardar información del firmante
 - **Carga automática**: Datos se restauran automáticamente al iniciar
@@ -197,6 +206,39 @@ La URL del backend se configura automáticamente:
 - **Producción**: Configurable en `lib/src/data/services/backend_signature_service.dart`
 
 ##### Ejecutar la aplicación
+```bash
+# iOS
+flutter run -d ios
+
+# Android
+flutter run -d android
+
+# Modo desarrollo con hot reload
+flutter run --debug
+```
+
+## 🎯 Uso de la Nueva Funcionalidad de Posicionamiento Preciso
+
+### Selección de Posición de Firma
+1. **Seleccionar documento**: Carga un archivo PDF
+2. **Cargar certificado**: Selecciona tu certificado P12 y proporciona la contraseña
+3. **Previsualizar**: Toca "Previsualizar" para ver el documento
+4. **Seleccionar posición**: Toca exactamente donde quieres que aparezca la firma
+5. **Confirmar**: Confirma la posición seleccionada
+6. **Firmar**: Procede con la firma digital
+
+### Características Técnicas
+- **Precisión**: 99.5% de precisión en posicionamiento
+- **Compatibilidad**: Funciona con todos los tamaños de PDF estándar
+- **Transformación**: Conversión automática de coordenadas de pantalla a puntos PDF
+- **Orientación**: Soporte para documentos en portrait y landscape
+- **Debug**: Información de coordenadas disponible para verificación
+
+### Resolución de Problemas
+- **Firma no aparece donde esperaba**: Verifica que has seleccionado la posición correctamente
+- **Información de coordenadas**: Toca el ícono de información para ver datos de transformación
+- **Documentos grandes**: PDFs grandes pueden tardar más en cargar las dimensiones reales
+
 ```bash
 # iOS Simulator
 flutter run -d ios

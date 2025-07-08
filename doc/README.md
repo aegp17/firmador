@@ -15,6 +15,7 @@ Los Architecture Decision Records documentan todas las decisiones técnicas impo
 - [ADR-006: Implementación de Previsualización PDF](adr/006-previsualizacion-pdf.md)
 - [ADR-007: Persistencia de Datos del Usuario](adr/007-persistencia-datos-usuario.md)
 - [ADR-008: Monitoreo Automático del Servidor](adr/008-monitoreo-automatico-servidor.md)
+- [ADR-009: Precisión en Posicionamiento de Firma Digital](adr/009-precision-posicionamiento-firma.md)
 
 ### 🚀 Backend Documentation
 Documentación específica del backend Spring Boot:
@@ -57,6 +58,7 @@ Documentación específica del frontend Flutter:
 ### Mejoras UX Implementadas
 - ✅ Previsualización de documentos PDF
 - ✅ Selección visual de posición de firma
+- ✅ **Posicionamiento preciso de firma digital** (Enero 2025)
 - ✅ Persistencia de datos del usuario
 - ✅ Monitoreo automático del servidor (cada 2 minutos)
 - ✅ Eliminación del campo email del formulario
@@ -85,5 +87,5 @@ Seguimos el formato estándar ADR:
 
 ---
 
-📝 **Última actualización**: Diciembre 2024  
+📝 **Última actualización**: Enero 2025  
 👥 **Mantenido por**: Equipo de Desarrollo Firmador 
