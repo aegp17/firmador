@@ -49,7 +49,7 @@ class BackendSignatureService {
     try {
       // Create form data
       final formData = FormData.fromMap({
-        'document': await MultipartFile.fromFile(
+        'file': await MultipartFile.fromFile(
           documentFile.path,
           filename: documentFile.path.split('/').last,
           contentType: DioMediaType.parse('application/pdf'),
@@ -63,7 +63,7 @@ class BackendSignatureService {
         'signerId': signerId,
         'location': location,
         'reason': reason,
-        'certificatePassword': certificatePassword,
+        'password': certificatePassword,
         'signatureX': signatureX,
         'signatureY': signatureY,
         'signatureWidth': signatureWidth,
