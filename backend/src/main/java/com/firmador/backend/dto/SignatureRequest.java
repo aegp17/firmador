@@ -23,11 +23,11 @@ public class SignatureRequest {
     @NotBlank(message = "Certificate password is required")
     private String certificatePassword;
     
-    // Signature appearance settings
-    private Integer signatureX = 100;
-    private Integer signatureY = 100;
-    private Integer signatureWidth = 200;
-    private Integer signatureHeight = 80;
+    // Signature appearance settings (in PDF points)
+    private Double signatureX = 100.0;
+    private Double signatureY = 100.0;
+    private Double signatureWidth = 150.0;
+    private Double signatureHeight = 50.0;
     private Integer signaturePage = 1;
     
     // Constructors
@@ -93,35 +93,35 @@ public class SignatureRequest {
         this.certificatePassword = certificatePassword;
     }
     
-    public Integer getSignatureX() {
+    public Double getSignatureX() {
         return signatureX;
     }
     
-    public void setSignatureX(Integer signatureX) {
+    public void setSignatureX(Double signatureX) {
         this.signatureX = signatureX;
     }
     
-    public Integer getSignatureY() {
+    public Double getSignatureY() {
         return signatureY;
     }
     
-    public void setSignatureY(Integer signatureY) {
+    public void setSignatureY(Double signatureY) {
         this.signatureY = signatureY;
     }
     
-    public Integer getSignatureWidth() {
+    public Double getSignatureWidth() {
         return signatureWidth;
     }
     
-    public void setSignatureWidth(Integer signatureWidth) {
+    public void setSignatureWidth(Double signatureWidth) {
         this.signatureWidth = signatureWidth;
     }
     
-    public Integer getSignatureHeight() {
+    public Double getSignatureHeight() {
         return signatureHeight;
     }
     
-    public void setSignatureHeight(Integer signatureHeight) {
+    public void setSignatureHeight(Double signatureHeight) {
         this.signatureHeight = signatureHeight;
     }
     

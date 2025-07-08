@@ -937,10 +937,10 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
         location: _locationController.text,
         reason: _reasonController.text,
         certificatePassword: _passwordController.text,
-        signatureX: _signaturePosition!.x.toInt(),
-        signatureY: _signaturePosition!.y.toInt(),
-        signatureWidth: 200,
-        signatureHeight: 80,
+        signatureX: _signaturePosition!.x,
+        signatureY: _signaturePosition!.y,
+        signatureWidth: _signaturePosition!.signatureWidth,
+        signatureHeight: _signaturePosition!.signatureHeight,
         signaturePage: _signaturePosition!.pageNumber,
       );
 

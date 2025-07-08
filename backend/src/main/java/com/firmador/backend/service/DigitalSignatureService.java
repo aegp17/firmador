@@ -103,10 +103,10 @@ public class DigitalSignatureService {
         
         // Set signature rectangle
         Rectangle signatureRect = new Rectangle(
-            signatureRequest.getSignatureX(), 
-            signatureRequest.getSignatureY(), 
-            signatureRequest.getSignatureWidth(), 
-            signatureRequest.getSignatureHeight()
+            signatureRequest.getSignatureX().floatValue(), 
+            signatureRequest.getSignatureY().floatValue(), 
+            signatureRequest.getSignatureWidth().floatValue(), 
+            signatureRequest.getSignatureHeight().floatValue()
         );
         appearance.setPageRect(signatureRect).setPageNumber(signatureRequest.getSignaturePage());
         

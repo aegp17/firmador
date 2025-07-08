@@ -40,10 +40,10 @@ class BackendSignatureService {
     required String location,
     required String reason,
     required String certificatePassword,
-    int signatureX = 100,
-    int signatureY = 100,
-    int signatureWidth = 200,
-    int signatureHeight = 80,
+    double signatureX = 100.0,
+    double signatureY = 100.0,
+    double signatureWidth = 150.0,
+    double signatureHeight = 50.0,
     int signaturePage = 1,
   }) async {
     try {

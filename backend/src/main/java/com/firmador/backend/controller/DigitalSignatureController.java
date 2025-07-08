@@ -39,10 +39,10 @@ public class DigitalSignatureController {
             @RequestParam("location") String location,
             @RequestParam("reason") String reason,
             @RequestParam("password") String certificatePassword,
-            @RequestParam(value = "signatureX", defaultValue = "100") Integer signatureX,
-            @RequestParam(value = "signatureY", defaultValue = "100") Integer signatureY,
-            @RequestParam(value = "signatureWidth", defaultValue = "200") Integer signatureWidth,
-            @RequestParam(value = "signatureHeight", defaultValue = "80") Integer signatureHeight,
+            @RequestParam(value = "signatureX", defaultValue = "100.0") Double signatureX,
+            @RequestParam(value = "signatureY", defaultValue = "100.0") Double signatureY,
+            @RequestParam(value = "signatureWidth", defaultValue = "150.0") Double signatureWidth,
+            @RequestParam(value = "signatureHeight", defaultValue = "50.0") Double signatureHeight,
             @RequestParam(value = "signaturePage", defaultValue = "1") Integer signaturePage) {
 
         try {
