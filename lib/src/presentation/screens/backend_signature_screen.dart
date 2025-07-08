@@ -5,6 +5,7 @@ import 'package:firmador/src/presentation/theme/app_theme.dart';
 import 'package:firmador/src/data/services/backend_signature_service.dart';
 import 'package:firmador/src/data/services/user_preferences_service.dart';
 import 'package:firmador/src/presentation/screens/pdf_preview_screen.dart';
+import 'package:firmador/src/domain/entities/certificate_info.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
@@ -796,7 +797,7 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
         }
       });
 
-      if (!result.success) {
+      if (!result.success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error al validar certificado: ${result.message}'),
@@ -811,12 +812,14 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
         _certificateInfo = null;
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al validar certificado: $e'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al validar certificado: $e'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
     }
   }
 
@@ -846,12 +849,14 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
     if (!_formKey.currentState!.validate()) return;
     if (_selectedDocument == null || _selectedCertificate == null) return;
     if (_signaturePosition == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor seleccione la posición de la firma'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Por favor seleccione la posición de la firma'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
       return;
     }
 
@@ -965,12 +970,14 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
         throw Exception('No se pudo abrir el enlace de descarga');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al descargar: $e'),
-          backgroundColor: AppTheme.error,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al descargar: $e'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
     }
   }
 } 
