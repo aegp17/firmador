@@ -17,12 +17,12 @@ class SignaturePosition {
 
 class PdfPreviewScreen extends StatefulWidget {
   final File pdfFile;
-  final Function(SignaturePosition?) onPositionSelected;
+  final Function(SignaturePosition?)? onPositionSelected;
 
   const PdfPreviewScreen({
     super.key,
     required this.pdfFile,
-    required this.onPositionSelected,
+    this.onPositionSelected,
   });
 
   @override
@@ -201,8 +201,8 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
-                          widget.onPositionSelected(null);
-                          Navigator.pop(context);
+                          widget.onPositionSelected?.call(null);
+                          Navigator.pop(context, null);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.lightGrey,
@@ -220,8 +220,8 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
                       child: ElevatedButton(
                         onPressed: _selectedPosition != null
                             ? () {
-                                widget.onPositionSelected(_selectedPosition);
-                                Navigator.pop(context);
+                                widget.onPositionSelected?.call(_selectedPosition);
+                                Navigator.pop(context, _selectedPosition);
                               }
                             : null,
                         style: ElevatedButton.styleFrom(

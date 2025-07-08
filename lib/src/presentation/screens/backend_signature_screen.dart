@@ -521,6 +521,8 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
                     }
                   });
                 }
+                // Update button state immediately when password changes
+                _updateButtonState();
               },
               validator: (value) {
                 if (value == null || value.isEmpty) {
@@ -843,9 +845,10 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
         );
       }
     }
+    
+    // Update button state after certificate validation
+    _updateButtonState();
   }
-
-
 
   Future<void> _selectSignaturePosition() async {
     if (_selectedDocument == null) return;
@@ -855,7 +858,6 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
       MaterialPageRoute(
         builder: (context) => PdfPreviewScreen(
           pdfFile: _selectedDocument!,
-          onPositionSelected: (position) => position,
         ),
       ),
     );
@@ -864,6 +866,19 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
       setState(() {
         _signaturePosition = position;
       });
+      // Update button state after position selection
+      _updateButtonState();
+      
+      // Show confirmation message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Posición de firma seleccionada en página ${position.pageNumber}'),
+            backgroundColor: AppTheme.success,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
