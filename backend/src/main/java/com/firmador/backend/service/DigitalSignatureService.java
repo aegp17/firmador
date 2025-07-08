@@ -130,7 +130,6 @@ public class DigitalSignatureService {
         StringBuilder sb = new StringBuilder();
         sb.append("Firmado digitalmente por:\n");
         sb.append(signatureRequest.getSignerName()).append("\n");
-        sb.append("Email: ").append(signatureRequest.getSignerEmail()).append("\n");
         sb.append("ID: ").append(signatureRequest.getSignerId()).append("\n");
         sb.append("Fecha: ").append(new Date()).append("\n");
         sb.append("Ubicación: ").append(signatureRequest.getLocation()).append("\n");

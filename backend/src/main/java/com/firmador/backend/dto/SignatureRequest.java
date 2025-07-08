@@ -8,9 +8,6 @@ public class SignatureRequest {
     @NotBlank(message = "Signer name is required")
     private String signerName;
     
-    @NotBlank(message = "Signer email is required")
-    private String signerEmail;
-    
     @NotBlank(message = "Signer ID is required")
     private String signerId;
     
@@ -36,11 +33,10 @@ public class SignatureRequest {
     // Constructors
     public SignatureRequest() {}
     
-    public SignatureRequest(String signerName, String signerEmail, String signerId, 
+    public SignatureRequest(String signerName, String signerId, 
                            String location, String reason, byte[] certificateData, 
                            String certificatePassword) {
         this.signerName = signerName;
-        this.signerEmail = signerEmail;
         this.signerId = signerId;
         this.location = location;
         this.reason = reason;
@@ -55,14 +51,6 @@ public class SignatureRequest {
     
     public void setSignerName(String signerName) {
         this.signerName = signerName;
-    }
-    
-    public String getSignerEmail() {
-        return signerEmail;
-    }
-    
-    public void setSignerEmail(String signerEmail) {
-        this.signerEmail = signerEmail;
     }
     
     public String getSignerId() {

@@ -38,8 +38,11 @@ La aplicación utiliza una arquitectura híbrida que combina:
 ### Frontend (Flutter)
 - ✅ Interfaz de usuario moderna y responsiva
 - ✅ Selección de archivos PDF y certificados P12
+- ✅ **Previsualización de documentos PDF** con navegación de páginas
+- ✅ **Selección visual de posición de firma** mediante toque en el documento
+- ✅ **Persistencia de datos del usuario** con opción "Recordar mis datos"
 - ✅ Validación en tiempo real de certificados
-- ✅ Monitoreo del estado del servidor en tiempo real
+- ✅ **Monitoreo automático del estado del servidor** (actualización cada 2 minutos)
 - ✅ Manejo de errores robusto con mensajes descriptivos
 - ✅ Soporte para iOS y Android
 - ✅ Dos modos de operación: servidor y local
@@ -58,6 +61,42 @@ La aplicación utiliza una arquitectura híbrida que combina:
 - ✅ CORS configurado para desarrollo y producción
 - ✅ Manejo de archivos temporales seguros
 
+## 🎯 Nuevas Funcionalidades UX
+
+### 📄 Previsualización de Documentos
+- **Visor PDF integrado**: Visualiza completamente el documento antes de firmar
+- **Navegación fluida**: Navega entre páginas con indicadores de progreso
+- **Responsivo**: Adaptado a diferentes tamaños de pantalla
+- **Zoom automático**: Ajuste óptimo para visualización
+
+### 🎯 Selección Visual de Posición de Firma
+- **Interfaz intuitiva**: Toca directamente donde quieres la firma
+- **Indicador visual**: Marcador claro de la posición seleccionada
+- **Información de página**: Muestra página actual y total de páginas
+- **Confirmación**: Proceso de confirmación antes de aplicar
+- **Persistencia**: La posición se mantiene durante la sesión
+
+### 💾 Persistencia de Datos del Usuario
+- **Recordar datos**: Checkbox para guardar información del firmante
+- **Carga automática**: Datos se restauran automáticamente al iniciar
+- **Privacidad**: Almacenamiento local seguro usando `SharedPreferences`
+- **Campos incluidos**: Nombre, Cédula/RUC, Ubicación, Razón de firma
+- **Gestión flexible**: Opción de limpiar datos guardados
+
+### 📡 Monitoreo Automático del Servidor
+- **Verificación continua**: Estado del servidor cada 2 minutos
+- **Actualización manual**: Botón de refresh disponible
+- **Indicadores visuales**: Iconos de estado en tiempo real
+- **Manejo de errores**: Notificaciones claras de problemas de conectividad
+- **Optimización**: Evita verificaciones innecesarias
+
+### 🔧 Mejoras en la Experiencia de Usuario
+- **Formularios inteligentes**: Validación en tiempo real
+- **Botones dinámicos**: Estados habilitados/deshabilitados según contexto
+- **Mensajes descriptivos**: Feedback claro para cada acción
+- **Progreso visual**: Indicadores de carga durante operaciones
+- **Navegación mejorada**: Flujo más intuitivo y lógico
+
 ## 📋 Requisitos
 
 ### Desarrollo
@@ -68,6 +107,21 @@ La aplicación utiliza una arquitectura híbrida que combina:
 - **Docker** (opcional, para despliegue)
 - **iOS Simulator** (para desarrollo iOS)
 - **Android Emulator** (para desarrollo Android)
+
+### Dependencias Principales
+#### Backend
+- **Spring Boot 3.x**: Framework principal
+- **iText 7.2.5**: Procesamiento y firma de PDFs
+- **BouncyCastle 1.70**: Operaciones criptográficas
+- **Jackson**: Serialización JSON
+
+#### Frontend
+- **Flutter Riverpod**: Gestión de estado reactivo
+- **Dio**: Cliente HTTP para comunicación con backend
+- **Syncfusion PDF Viewer**: Visualización de documentos PDF
+- **File Picker**: Selección de archivos del dispositivo
+- **Shared Preferences**: Persistencia de datos del usuario
+- **URL Launcher**: Apertura de enlaces de descarga
 
 ### Producción
 - **Docker** y **Docker Compose**
@@ -229,33 +283,43 @@ La aplicación ofrece dos modos de operación:
 #### 1. Verificar Conexión
 - Al abrir la pantalla, verifica que el indicador del servidor esté verde
 - Si está rojo, verifica la URL del backend y la conectividad
-- El sistema verifica automáticamente cada 30 segundos
+- El sistema verifica automáticamente cada 2 minutos
+- Botón de actualización manual disponible
 
 #### 2. Seleccionar Documento
-- Toca "Seleccionar PDF"
+- Toca "Seleccionar Documento PDF"
 - Elige el documento que deseas firmar
 - El sistema valida automáticamente que sea un PDF válido
+- **Previsualización disponible**: Usa "Previsualizar" para ver el documento
 
-#### 3. Seleccionar Certificado
-- Toca "Seleccionar .p12"
+#### 3. Seleccionar Posición de Firma
+- Toca "Seleccionar Posición" para abrir la previsualización
+- Navega entre páginas del documento
+- **Toca directamente en el documento** donde quieres la firma
+- Indicador visual muestra la posición seleccionada
+- Confirma la posición elegida
+
+#### 4. Seleccionar Certificado
+- Toca "Seleccionar Certificado (.p12)"
 - Elige tu certificado digital (formato P12/PFX)
 - Ingresa la contraseña del certificado
-- Toca "Validar Certificado" para verificar
-- El sistema extrae automáticamente la información del certificado
+- El sistema valida automáticamente el certificado
 
-#### 4. Completar Información del Firmante
+#### 5. Completar Información del Firmante
+- **Datos persistentes**: Marca "Recordar mis datos" para guardar información
 - Llena los campos requeridos:
   - **Nombre completo**: Nombre del firmante
-  - **Correo electrónico**: Email del firmante
-  - **Cédula/ID**: Identificación del firmante
-  - **Ubicación**: Lugar de la firma (opcional)
-  - **Razón**: Motivo de la firma (opcional)
+  - **Cédula/RUC**: Identificación del firmante
+  - **Ubicación**: Lugar de la firma (por defecto: Ecuador)
+  - **Razón**: Motivo de la firma (por defecto: Firma digital)
+- Los datos se cargan automáticamente en futuras sesiones si está activado
 
-#### 5. Firmar Documento
-- Toca "Firmar Documento"
+#### 6. Firmar Documento
+- Toca "Firmar Documento" (se activa cuando todo está listo)
 - El sistema muestra progreso en tiempo real
 - El documento firmado se procesa en el servidor
 - Se genera un estampado visual con la información del firmante
+- **Descarga directa**: Botón "Descargar PDF" en el diálogo de éxito
 
 ## 🔐 Seguridad
 
@@ -293,11 +357,15 @@ Firma un documento PDF.
 - `document` (file): Archivo PDF a firmar
 - `certificate` (file): Certificado P12/PFX
 - `signerName` (string): Nombre del firmante
-- `signerEmail` (string): Email del firmante
-- `signerId` (string): Cédula/ID del firmante
+- `signerId` (string): Cédula/RUC del firmante
 - `location` (string): Ubicación de la firma (opcional)
 - `reason` (string): Razón de la firma (opcional)
 - `certificatePassword` (string): Contraseña del certificado
+- `signatureX` (int): Posición X de la firma (opcional, default: 100)
+- `signatureY` (int): Posición Y de la firma (opcional, default: 100)
+- `signatureWidth` (int): Ancho de la firma (opcional, default: 200)
+- `signatureHeight` (int): Alto de la firma (opcional, default: 80)
+- `signaturePage` (int): Página donde colocar la firma (opcional, default: 1)
 
 **Respuesta exitosa (200):**
 ```json
@@ -308,7 +376,7 @@ Firma un documento PDF.
   "filename": "documento_firmado.pdf",
   "signedAt": "2024-01-01T12:00:00Z",
   "fileSize": 1024,
-  "downloadUrl": "/api/documents/download/550e8400-e29b-41d4-a716-446655440000"
+  "downloadUrl": "/api/signature/download/550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
@@ -352,6 +420,17 @@ Extrae información detallada de un certificado.
   "signatureAlgorithm": "SHA256withRSA"
 }
 ```
+
+#### GET `/api/signature/download/{documentId}`
+Descarga un documento firmado.
+
+**Parámetros:**
+- `documentId` (path): ID del documento generado durante la firma
+
+**Respuesta exitosa (200):**
+- **Content-Type**: `application/pdf`
+- **Content-Disposition**: `attachment; filename="documento_firmado.pdf"`
+- Datos binarios del PDF firmado
 
 #### GET `/api/signature/health`
 Verifica el estado del servidor.
