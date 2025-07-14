@@ -1,0 +1,57 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: firmador-backend
+  
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 110MB
+      enabled: true
+      location: /tmp
+  
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    time-zone: UTC
+
+logging:
+  level:
+    com.firmador: INFO
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+    org.hibernate: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  server:
+    port: 8081
+
+# Custom application properties for Docker
+firmador:
+  storage:
+    path: /app/storage
+  signature:
+    default-location: "Ecuador"
+    default-reason: "Documento firmado digitalmente"
+  security:
+    max-file-size-mb: 100
+    allowed-file-types: pdf
+    allowed-certificate-types: p12,pfx,pkcs12
+  cors:
+    allowed-origins: "*"
+    allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+    allowed-headers: "*"
+    max-age: 3600 

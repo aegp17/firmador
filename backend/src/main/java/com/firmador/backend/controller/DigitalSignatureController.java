@@ -51,7 +51,7 @@ public class DigitalSignatureController {
             @RequestParam(value = "signatureHeight", defaultValue = "50.0") Double signatureHeight,
             @RequestParam(value = "signaturePage", defaultValue = "1") Integer signaturePage,
             @RequestParam(value = "enableTimestamp", defaultValue = "false") Boolean enableTimestamp,
-            @RequestParam(value = "timestampServerUrl", defaultValue = "http://timestamp.digicert.com") String timestampServerUrl) {
+            @RequestParam(value = "timestampServerUrl", defaultValue = "https://freetsa.org/tsr") String timestampServerUrl) {
         
         try {
             // Validation

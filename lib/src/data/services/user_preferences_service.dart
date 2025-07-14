@@ -48,7 +48,7 @@ class UserPreferencesService {
       'location': prefs.getString(_keyLocation) ?? 'Ecuador',
       'reason': prefs.getString(_keyReason) ?? 'Firma digital',
       'enableTimestamp': prefs.getString(_keyEnableTimestamp) ?? 'false',
-      'tsaServer': prefs.getString(_keyTsaServer) ?? 'http://timestamp.digicert.com',
+      'tsaServer': prefs.getString(_keyTsaServer) ?? 'https://freetsa.org/tsr',
     };
   }
 

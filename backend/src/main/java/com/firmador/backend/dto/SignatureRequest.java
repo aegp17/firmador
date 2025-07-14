@@ -32,7 +32,7 @@ public class SignatureRequest {
     
     // Timestamp settings
     private Boolean enableTimestamp = false;
-    private String timestampServerUrl = "http://timestamp.digicert.com";
+    private String timestampServerUrl = "https://freetsa.org/tsr";
     
     // Constructors
     public SignatureRequest() {}

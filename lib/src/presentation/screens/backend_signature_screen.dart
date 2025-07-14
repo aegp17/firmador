@@ -1,15 +1,19 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firmador/src/presentation/providers/backend_signature_provider.dart';
-import 'package:firmador/src/presentation/theme/app_theme.dart';
+import 'dart:async';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:firmador/src/data/services/backend_signature_service.dart';
 import 'package:firmador/src/data/services/user_preferences_service.dart';
-import 'package:firmador/src/presentation/screens/pdf_preview_screen.dart';
+import 'package:dio/dio.dart';
 import 'package:firmador/src/domain/entities/certificate_info.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:firmador/src/presentation/providers/backend_signature_provider.dart';
+import 'package:firmador/src/presentation/screens/pdf_preview_screen.dart';
+import 'package:firmador/src/presentation/theme/app_theme.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:io';
-import 'dart:async';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
 
 class BackendSignatureScreen extends ConsumerStatefulWidget {
   const BackendSignatureScreen({super.key});
@@ -37,27 +41,44 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
   bool _isValidatingCertificate = false;
   bool _isCertificateValid = false;
   Timer? _healthCheckTimer;
+  Timer? _certificateValidationTimer;
   
   // Timestamp settings
   bool _enableTimestamp = false;
-  String _selectedTsaServer = 'http://timestamp.digicert.com';
+  String _selectedTsaServer = 'https://freetsa.org/tsr';
+  bool _testingTsaConnection = false;
+  bool? _tsaConnectionStatus;
   
   final List<Map<String, String>> _tsaServers = [
     {
       'name': 'DigiCert (Recomendado)',
       'url': 'http://timestamp.digicert.com',
+      'description': 'Servicio profesional de DigiCert, alta confiabilidad'
     },
     {
-      'name': 'Apple',
-      'url': 'http://timestamp.apple.com/ts01',
-    },
-    {
-      'name': 'FreeTSA',
+      'name': 'FreeTSA (Gratuito)',
       'url': 'https://freetsa.org/tsr',
+      'description': 'Servicio gratuito y confiable con soporte RFC 3161'
     },
     {
-      'name': 'Certum',
+      'name': 'Apple Timestamp',
+      'url': 'http://timestamp.apple.com/ts01',
+      'description': 'Servidor oficial de Apple para desarrolladores'
+    },
+    {
+      'name': 'Certum Timestamp',
       'url': 'http://time.certum.pl',
+      'description': 'Autoridad de certificación europea'
+    },
+    {
+      'name': 'Sectigo (Comodo)',
+      'url': 'http://timestamp.sectigo.com',
+      'description': 'Servicio de Sectigo (anteriormente Comodo)'
+    },
+    {
+      'name': 'GlobalSign',
+      'url': 'http://timestamp.globalsign.com/scripts/timstamp.dll',
+      'description': 'Servicio de GlobalSign CA'
     },
   ];
 
@@ -101,6 +122,7 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
     _locationController.dispose();
     _reasonController.dispose();
     _healthCheckTimer?.cancel();
+    _certificateValidationTimer?.cancel();
     super.dispose();
   }
 
@@ -122,7 +144,7 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
         _locationController.text = userData['location'] ?? 'Ecuador';
         _reasonController.text = userData['reason'] ?? 'Firma digital';
         _enableTimestamp = userData['enableTimestamp'] == 'true';
-        _selectedTsaServer = userData['tsaServer'] ?? 'http://timestamp.digicert.com';
+        _selectedTsaServer = userData['tsaServer'] ?? 'https://freetsa.org/tsr';
       });
     }
   }
@@ -140,6 +162,59 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
       );
     } else {
       await UserPreferencesService.clearUserData();
+    }
+  }
+
+  Future<void> _testTsaConnection() async {
+    setState(() {
+      _testingTsaConnection = true;
+      _tsaConnectionStatus = null;
+    });
+
+    try {
+      // Create a simple HTTP client to test connectivity
+      final dio = Dio();
+      dio.options.connectTimeout = const Duration(seconds: 10);
+      dio.options.receiveTimeout = const Duration(seconds: 10);
+      
+      // Test basic connectivity to the TSA server
+      final response = await dio.head(_selectedTsaServer);
+      
+      setState(() {
+        _tsaConnectionStatus = response.statusCode == 200 || 
+                              response.statusCode == 405 || // Method not allowed is OK for TSA
+                              response.statusCode == 400;   // Bad request is OK for TSA
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_tsaConnectionStatus! 
+                ? 'Conexión exitosa al servidor TSA' 
+                : 'Error de conexión al servidor TSA'),
+            backgroundColor: _tsaConnectionStatus! ? AppTheme.success : AppTheme.error,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _tsaConnectionStatus = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al conectar con el servidor TSA: ${e.toString()}'),
+            backgroundColor: AppTheme.error,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _testingTsaConnection = false;
+      });
     }
   }
 
@@ -526,7 +601,7 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
                       )
                     else if (_isCertificateValid)
                       const Icon(Icons.check_circle, color: AppTheme.success)
-                    else if (_passwordController.text.isNotEmpty)
+                    else if (_passwordController.text.isNotEmpty && !_isValidatingCertificate)
                       const Icon(Icons.error, color: AppTheme.error),
                     IconButton(
                       icon: Icon(
@@ -542,14 +617,26 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
                 ),
               ),
               onChanged: (value) {
-                if (value.isNotEmpty && _selectedCertificate != null) {
-                  // Validate certificate after a short delay
-                  Future.delayed(const Duration(milliseconds: 500), () {
-                    if (_passwordController.text == value) {
+                // Cancel previous validation timer
+                _certificateValidationTimer?.cancel();
+                
+                // Reset certificate validation state when password changes
+                if (value.isEmpty) {
+                  setState(() {
+                    _isCertificateValid = false;
+                    _certificateInfo = null;
+                    _isValidatingCertificate = false;
+                  });
+                } else if (value.length >= 3 && _selectedCertificate != null) {
+                  // Only start validation after user has typed at least 3 characters
+                  // and wait 1.5 seconds after they stop typing
+                  _certificateValidationTimer = Timer(const Duration(milliseconds: 1500), () {
+                    if (_passwordController.text == value && value.isNotEmpty) {
                       _validateCertificate();
                     }
                   });
                 }
+                
                 // Update button state immediately when password changes
                 _updateButtonState();
               },
@@ -562,6 +649,22 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
                 return null;
               },
             ),
+            const SizedBox(height: 12),
+            // Manual validation button
+            if (_passwordController.text.isNotEmpty && !_isCertificateValid && !_isValidatingCertificate)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _validateCertificate,
+                  icon: const Icon(Icons.verified_user),
+                  label: const Text('Validar Certificado'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: const BorderSide(color: AppTheme.primaryCyan),
+                    foregroundColor: AppTheme.primaryCyan,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -771,12 +874,30 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
                 value: _selectedTsaServer,
                 items: _tsaServers.map((server) => DropdownMenuItem(
                   value: server['url'],
-                  child: Text(server['name']!),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        server['name']!,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                      if (server['description'] != null)
+                        Text(
+                          server['description']!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                    ],
+                  ),
                 )).toList(),
                 onChanged: (String? newValue) {
                   if (newValue != null) {
                     setState(() {
                       _selectedTsaServer = newValue;
+                      _tsaConnectionStatus = null; // Reset connection status
                     });
                   }
                 },
@@ -787,6 +908,53 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
                   return null;
                 },
               ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _testingTsaConnection ? null : _testTsaConnection,
+                      icon: _testingTsaConnection 
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Icon(
+                              _tsaConnectionStatus == null 
+                                  ? Icons.network_check 
+                                  : _tsaConnectionStatus! 
+                                      ? Icons.check_circle 
+                                      : Icons.error,
+                              size: 18,
+                            ),
+                      label: Text(_testingTsaConnection 
+                          ? 'Probando...' 
+                          : 'Probar Conexión TSA'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _tsaConnectionStatus == null 
+                            ? AppTheme.primaryCyan 
+                            : _tsaConnectionStatus! 
+                                ? AppTheme.success 
+                                : AppTheme.error,
+                        foregroundColor: AppTheme.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  if (_tsaConnectionStatus != null) ...[
+                    const SizedBox(width: 8),
+                    Icon(
+                      _tsaConnectionStatus! ? Icons.check_circle : Icons.error_outline,
+                      color: _tsaConnectionStatus! ? AppTheme.success : AppTheme.error,
+                      size: 20,
+                    ),
+                  ],
+                ],
+              ),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -795,18 +963,40 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: AppTheme.primaryCyan.withValues(alpha: 0.3)),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.info_outline, color: AppTheme.primaryCyan, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'El timestamp proporciona evidencia criptográfica de cuándo se firmó el documento.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.primaryCyan,
+                    Row(
+                      children: [
+                        const Icon(Icons.info_outline, color: AppTheme.primaryCyan, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'El timestamp proporciona evidencia criptográfica de cuándo se firmó el documento.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.primaryCyan,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.backup, color: AppTheme.success, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Sistema de fallback automático: si el servidor seleccionado falla, se intentará con servidores alternativos.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.success,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -948,23 +1138,19 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
         _isCertificateValid = result.success;
         _certificateInfo = result.certificateInfo;
         
-        // Auto-fill signer name and ID if available
-        if (result.success && result.certificateInfo != null) {
+        // Auto-fill signer name if available and field is empty
+        if (result.success && result.certificateInfo != null && _signerNameController.text.isEmpty) {
           _signerNameController.text = result.certificateInfo!.commonName;
-          // Extract email from subject if available
-          final subject = result.certificateInfo!.subject;
-          final emailMatch = RegExp(r'emailAddress=([^,]+)').firstMatch(subject);
-          if (emailMatch != null) {
-            // Could be used for email field if needed
-          }
         }
       });
 
-      if (!result.success && mounted) {
+      // Only show success message, not error messages to avoid UX issues
+      if (result.success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al validar certificado: ${result.message}'),
-            backgroundColor: AppTheme.error,
+            content: Text('Certificado validado correctamente'),
+            backgroundColor: AppTheme.success,
+            duration: Duration(seconds: 2),
           ),
         );
       }
@@ -975,14 +1161,8 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
         _certificateInfo = null;
       });
       
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al validar certificado: $e'),
-            backgroundColor: AppTheme.error,
-          ),
-        );
-      }
+      // Don't show error SnackBars automatically - let user see visual indicators
+      debugPrint('Certificate validation error: $e');
     }
     
     // Update button state after certificate validation
@@ -1067,6 +1247,12 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
     try {
       await _saveUserPreferences();
 
+      // Convert signature position to PDF coordinates
+      final pdfPosition = _signaturePosition!.toPdfCoordinates();
+      
+      debugPrint('Original position: ${_signaturePosition.toString()}');
+      debugPrint('PDF position: ${pdfPosition.toString()}');
+
       final backendService = BackendSignatureService();
       final result = await backendService.signDocument(
         documentFile: _selectedDocument!,
@@ -1076,11 +1262,11 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
         location: _locationController.text,
         reason: _reasonController.text,
         certificatePassword: _passwordController.text,
-        signatureX: _signaturePosition!.x,
-        signatureY: _signaturePosition!.y,
-        signatureWidth: _signaturePosition!.signatureWidth,
-        signatureHeight: _signaturePosition!.signatureHeight,
-        signaturePage: _signaturePosition!.pageNumber,
+        signatureX: pdfPosition.x,
+        signatureY: pdfPosition.y,
+        signatureWidth: pdfPosition.signatureWidth,
+        signatureHeight: pdfPosition.signatureHeight,
+        signaturePage: pdfPosition.pageNumber,
         enableTimestamp: _enableTimestamp,
         timestampServerUrl: _selectedTsaServer,
       );
@@ -1091,6 +1277,8 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
         _showErrorDialog(result.message);
       }
     } catch (e) {
+      debugPrint('Error signing document: $e');
+      debugPrint('Stack trace: ${StackTrace.current}');
       _showErrorDialog('Error inesperado: $e');
     } finally {
       setState(() {
@@ -1141,13 +1329,14 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
             child: const Text('Cerrar'),
           ),
           if (result.downloadUrl != null)
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: () => _downloadDocument(result.downloadUrl!),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryCyan,
                 foregroundColor: AppTheme.white,
               ),
-              child: const Text('Descargar PDF'),
+              icon: const Icon(Icons.folder_open, size: 18),
+              label: const Text('Ver Archivo'),
             ),
         ],
       ),
@@ -1176,20 +1365,226 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
     );
   }
 
-  Future<void> _downloadDocument(String downloadUrl) async {
+  Future<void> _downloadDocument(String filePath) async {
     try {
-      final fullUrl = 'http://localhost:8080$downloadUrl';
-      final uri = Uri.parse(fullUrl);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-      } else {
-        throw Exception('No se pudo abrir el enlace de descarga');
+      final file = File(filePath);
+      if (!await file.exists()) {
+        throw Exception('El archivo firmado no se encuentra');
+      }
+
+      // Show options dialog for user to choose action
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.file_download, color: AppTheme.primaryCyan),
+                SizedBox(width: 8),
+                Text('Archivo Firmado'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('El documento firmado está listo:'),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.lightGrey,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.picture_as_pdf, color: AppTheme.error),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          file.path.split('/').last,
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Ubicación: ${file.parent.path}',
+                  style: const TextStyle(fontSize: 12, color: AppTheme.mediumGrey),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cerrar'),
+              ),
+              TextButton.icon(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await _copyToClipboard(file.path);
+                },
+                icon: const Icon(Icons.copy, size: 18),
+                label: const Text('Copiar Ruta'),
+              ),
+              TextButton.icon(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await _saveToDownloads(file);
+                },
+                icon: const Icon(Icons.download, size: 18),
+                label: const Text('Descargar'),
+              ),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await _openFile(file.path);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryCyan,
+                  foregroundColor: AppTheme.white,
+                ),
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: const Text('Abrir'),
+              ),
+            ],
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al descargar: $e'),
+            content: Text('Error al procesar el archivo: $e'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _openFile(String filePath) async {
+    try {
+      final result = await OpenFile.open(filePath);
+      
+      // Check if the file was opened successfully
+      if (result.type == ResultType.done) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Archivo abierto exitosamente'),
+              backgroundColor: AppTheme.success,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        // If open_file fails, try with url_launcher as fallback
+        try {
+          final uri = Uri.file(filePath);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Archivo abierto con aplicación externa'),
+                  backgroundColor: AppTheme.success,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+          } else {
+            throw Exception('No se encontró una aplicación para abrir archivos PDF');
+          }
+        } catch (fallbackError) {
+          throw Exception('Error al abrir archivo: ${result.message}');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al abrir el archivo: $e'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveToDownloads(File sourceFile) async {
+    try {
+      // Get Downloads directory (platform specific)
+      Directory? downloadsDir;
+      
+      if (Platform.isAndroid) {
+        downloadsDir = Directory('/storage/emulated/0/Download');
+      } else if (Platform.isIOS) {
+        // iOS doesn't have a public Downloads folder, use Documents
+        downloadsDir = await getApplicationDocumentsDirectory();
+      } else {
+        // macOS/other platforms
+        final homeDir = Platform.environment['HOME'];
+        if (homeDir != null) {
+          downloadsDir = Directory('$homeDir/Downloads');
+        }
+      }
+      
+      if (downloadsDir == null || !await downloadsDir.exists()) {
+        // Fallback to Documents directory
+        downloadsDir = await getApplicationDocumentsDirectory();
+      }
+      
+      final fileName = sourceFile.path.split('/').last;
+      final targetFile = File('${downloadsDir.path}/$fileName');
+      
+      // Copy file to downloads
+      await sourceFile.copy(targetFile.path);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Archivo guardado en: ${targetFile.path}'),
+            backgroundColor: AppTheme.success,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Abrir',
+              onPressed: () => _openFile(targetFile.path),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al guardar en Descargas: $e'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _copyToClipboard(String text) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: text));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ruta copiada al portapapeles'),
+            backgroundColor: AppTheme.success,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al copiar: $e'),
             backgroundColor: AppTheme.error,
           ),
         );
