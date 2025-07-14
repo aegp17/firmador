@@ -6,6 +6,9 @@ import com.firmador.backend.dto.SignatureResponse;
 import com.firmador.backend.service.DigitalSignatureService;
 import com.firmador.backend.service.DocumentStorageService;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -21,7 +24,10 @@ import java.util.Map;
 @CrossOrigin(origins = "*")
 public class DigitalSignatureController {
 
-    private final DigitalSignatureService digitalSignatureService;
+    private static final Logger logger = LoggerFactory.getLogger(DigitalSignatureController.class);
+
+    @Autowired
+    private DigitalSignatureService digitalSignatureService;
     private final DocumentStorageService documentStorageService;
 
     public DigitalSignatureController(DigitalSignatureService digitalSignatureService,
@@ -30,68 +36,70 @@ public class DigitalSignatureController {
         this.documentStorageService = documentStorageService;
     }
 
-    @PostMapping(value = "/sign", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<SignatureResponse> signDocument(
-            @RequestParam("file") MultipartFile document,
-            @RequestParam("certificate") MultipartFile certificate,
-            @RequestParam(value = "signerName", required = false) String signerName,
+    @PostMapping("/sign")
+    public ResponseEntity<?> signDocument(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("signerName") String signerName,
             @RequestParam("signerId") String signerId,
             @RequestParam("location") String location,
             @RequestParam("reason") String reason,
-            @RequestParam("password") String certificatePassword,
+            @RequestParam("certificate") MultipartFile certificate,
+            @RequestParam("certificatePassword") String certificatePassword,
             @RequestParam(value = "signatureX", defaultValue = "100.0") Double signatureX,
             @RequestParam(value = "signatureY", defaultValue = "100.0") Double signatureY,
             @RequestParam(value = "signatureWidth", defaultValue = "150.0") Double signatureWidth,
             @RequestParam(value = "signatureHeight", defaultValue = "50.0") Double signatureHeight,
-            @RequestParam(value = "signaturePage", defaultValue = "1") Integer signaturePage) {
-
+            @RequestParam(value = "signaturePage", defaultValue = "1") Integer signaturePage,
+            @RequestParam(value = "enableTimestamp", defaultValue = "false") Boolean enableTimestamp,
+            @RequestParam(value = "timestampServerUrl", defaultValue = "https://freetsa.org/tsr") String timestampServerUrl) {
+        
         try {
-            // Validate file types
-            if (!isPdfFile(document)) {
+            // Validation
+            if (file.isEmpty()) {
                 return ResponseEntity.badRequest()
-                    .body(new SignatureResponse(false, "El archivo debe ser un PDF"));
+                    .body(Map.of("error", "File is required"));
             }
-
-            if (!isCertificateFile(certificate)) {
+            
+            if (certificate.isEmpty()) {
                 return ResponseEntity.badRequest()
-                    .body(new SignatureResponse(false, "El certificado debe ser un archivo .p12 o .pfx"));
+                    .body(Map.of("error", "Certificate file is required"));
             }
-
-            // Extract signer name from certificate if not provided
-            String finalSignerName = signerName;
-            if (finalSignerName == null || finalSignerName.trim().isEmpty()) {
-                try {
-                    CertificateInfo certInfo = digitalSignatureService.extractCertificateInfo(
-                        certificate.getBytes(), certificatePassword);
-                    finalSignerName = certInfo.getCommonName();
-                } catch (Exception e) {
-                    finalSignerName = "Firmante Digital";
-                }
-            }
-
+            
             // Create signature request
-            SignatureRequest signatureRequest = new SignatureRequest();
-            signatureRequest.setSignerName(finalSignerName);
-            signatureRequest.setSignerId(signerId);
-            signatureRequest.setLocation(location);
-            signatureRequest.setReason(reason);
-            signatureRequest.setCertificateData(certificate.getBytes());
-            signatureRequest.setCertificatePassword(certificatePassword);
-            signatureRequest.setSignatureX(signatureX);
-            signatureRequest.setSignatureY(signatureY);
-            signatureRequest.setSignatureWidth(signatureWidth);
-            signatureRequest.setSignatureHeight(signatureHeight);
-            signatureRequest.setSignaturePage(signaturePage);
-
+            SignatureRequest request = new SignatureRequest();
+            request.setSignerName(signerName);
+            request.setSignerId(signerId);
+            request.setLocation(location);
+            request.setReason(reason);
+            request.setCertificateData(certificate.getBytes());
+            request.setCertificatePassword(certificatePassword);
+            request.setSignatureX(signatureX);
+            request.setSignatureY(signatureY);
+            request.setSignatureWidth(signatureWidth);
+            request.setSignatureHeight(signatureHeight);
+            request.setSignaturePage(signaturePage);
+            request.setEnableTimestamp(enableTimestamp);
+            request.setTimestampServerUrl(timestampServerUrl);
+            
             // Sign the document
-            SignatureResponse response = digitalSignatureService.signDocument(
-                document.getBytes(), signatureRequest);
-
-            return ResponseEntity.ok(response);
-
+            byte[] signedPdf = digitalSignatureService.signPdf(file.getBytes(), request);
+            
+            // Generate response filename
+            String originalFilename = file.getOriginalFilename();
+            String signedFilename = originalFilename != null ? 
+                originalFilename.replaceFirst("(\\.[^.]*)?$", "_signed$1") :
+                "signed_document.pdf";
+            
+            // Return signed PDF
+            return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + signedFilename + "\"")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
+                .body(signedPdf);
+            
         } catch (Exception e) {
+            logger.error("Error during document signing", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new SignatureResponse(false, "Error interno del servidor: " + e.getMessage()));
+                .body(Map.of("error", "Failed to sign document: " + e.getMessage()));
         }
     }
 

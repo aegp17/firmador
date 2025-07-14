@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:firmador/src/domain/entities/certificate_info.dart';
+import 'package:path_provider/path_provider.dart';
 
 class BackendSignatureService {
   static const String _baseUrl = 'http://localhost:8080'; // Change for production
@@ -45,6 +46,8 @@ class BackendSignatureService {
     double signatureWidth = 150.0,
     double signatureHeight = 50.0,
     int signaturePage = 1,
+    bool enableTimestamp = false,
+    String timestampServerUrl = 'https://freetsa.org/tsr',
   }) async {
     try {
       // Create form data
@@ -63,33 +66,87 @@ class BackendSignatureService {
         'signerId': signerId,
         'location': location,
         'reason': reason,
-        'password': certificatePassword,
+        'certificatePassword': certificatePassword,
         'signatureX': signatureX,
         'signatureY': signatureY,
         'signatureWidth': signatureWidth,
         'signatureHeight': signatureHeight,
         'signaturePage': signaturePage,
+        'enableTimestamp': enableTimestamp,
+        'timestampServerUrl': timestampServerUrl,
       });
 
-      // Send request
+      // Send request with responseType bytes to handle PDF response
       final response = await _dio.post(
         '/api/signature/sign',
         data: formData,
+        options: Options(
+          responseType: ResponseType.bytes,
+        ),
       );
 
       if (response.statusCode == 200) {
-        final data = response.data;
-        return SignatureResult(
-          success: data['success'] ?? false,
-          message: data['message'] ?? 'Documento firmado exitosamente',
-          documentId: data['documentId'],
-          filename: data['filename'],
-          downloadUrl: data['downloadUrl'],
-          signedAt: data['signedAt'] != null 
-              ? DateTime.parse(data['signedAt']) 
-              : DateTime.now(),
-          fileSize: data['fileSize'] ?? 0,
-        );
+        // Backend returns PDF bytes directly, not JSON
+        final pdfBytes = response.data as List<int>;
+        
+        // Extract filename from Content-Disposition header
+        String filename = 'signed_document.pdf';
+        final contentDisposition = response.headers.value('content-disposition');
+        if (contentDisposition != null) {
+          final filenameMatch = RegExp(r'filename="([^"]+)"').firstMatch(contentDisposition);
+          if (filenameMatch != null) {
+            filename = filenameMatch.group(1) ?? filename;
+          }
+        }
+        
+        // Save the signed PDF to Documents directory for better user access
+        try {
+          final documentsDir = await getApplicationDocumentsDirectory();
+          final signedPdfsDir = Directory('${documentsDir.path}/Signed_PDFs');
+          
+          // Create directory if it doesn't exist
+          if (!await signedPdfsDir.exists()) {
+            await signedPdfsDir.create(recursive: true);
+          }
+          
+          // Create unique filename with timestamp if file already exists
+          String finalFilename = filename;
+          final baseFile = File('${signedPdfsDir.path}/$filename');
+          if (await baseFile.exists()) {
+            final timestamp = DateTime.now().millisecondsSinceEpoch;
+            final extension = filename.split('.').last;
+            final nameWithoutExt = filename.substring(0, filename.lastIndexOf('.'));
+            finalFilename = '${nameWithoutExt}_$timestamp.$extension';
+          }
+          
+          final finalFile = File('${signedPdfsDir.path}/$finalFilename');
+          await finalFile.writeAsBytes(pdfBytes);
+          
+          return SignatureResult(
+            success: true,
+            message: 'Documento firmado exitosamente',
+            documentId: null,
+            filename: finalFilename,
+            downloadUrl: finalFile.path, // Use local file path
+            signedAt: DateTime.now(),
+            fileSize: pdfBytes.length,
+          );
+        } catch (e) {
+          // Fallback to temp directory if Documents directory fails
+          final tempDir = Directory.systemTemp;
+          final tempFile = File('${tempDir.path}/$filename');
+          await tempFile.writeAsBytes(pdfBytes);
+          
+          return SignatureResult(
+            success: true,
+            message: 'Documento firmado exitosamente (guardado temporalmente)',
+            documentId: null,
+            filename: filename,
+            downloadUrl: tempFile.path,
+            signedAt: DateTime.now(),
+            fileSize: pdfBytes.length,
+          );
+        }
       } else {
         return SignatureResult(
           success: false,

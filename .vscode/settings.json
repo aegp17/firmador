@@ -1,1 +1,4 @@
-{"dart.flutterSdkPath": "/Users/angelgil/development/flutter"}
+{
+    "dart.flutterSdkPath": "/Users/angelgil/development/flutter",
+    "java.compile.nullAnalysis.mode": "automatic"
+}

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:firmador/src/presentation/theme/app_theme.dart';
 import 'dart:io';
@@ -79,11 +80,89 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
   double _pdfPageWidth = 612.0; // Default letter size in points
   double _pdfPageHeight = 792.0; // Default letter size in points
   bool _documentLoaded = false;
+  
+  // Cache display dimensions to avoid recalculating on every tap
+  double _displayWidth = 0;
+  double _displayHeight = 0;
+  double _offsetX = 0;
+  double _offsetY = 0;
+  bool _dimensionsCalculated = false;
+  
+  // Performance optimization: Debounce rapid taps
+  DateTime? _lastTapTime;
+  static const Duration _tapDebounceTime = Duration(milliseconds: 100);
 
   @override
   void dispose() {
     _pdfViewerController.dispose();
     super.dispose();
+  }
+
+  // Optimized dimension calculation with caching
+  void _calculateDisplayDimensions(BoxConstraints constraints) {
+    if (_dimensionsCalculated) return; // Use cached values if available
+    
+    try {
+      // Calculate PDF aspect ratio
+      final double pdfAspectRatio = _pdfPageWidth / _pdfPageHeight;
+      final double viewerAspectRatio = constraints.maxWidth / constraints.maxHeight;
+      
+      if (pdfAspectRatio > viewerAspectRatio) {
+        // PDF is wider than viewer - fit to width
+        _displayWidth = constraints.maxWidth;
+        _displayHeight = constraints.maxWidth / pdfAspectRatio;
+        _offsetX = 0;
+        _offsetY = (constraints.maxHeight - _displayHeight) / 2;
+      } else {
+        // PDF is taller than viewer - fit to height
+        _displayWidth = constraints.maxHeight * pdfAspectRatio;
+        _displayHeight = constraints.maxHeight;
+        _offsetX = (constraints.maxWidth - _displayWidth) / 2;
+        _offsetY = 0;
+      }
+      
+      _dimensionsCalculated = true;
+      debugPrint('Calculated display dimensions: ${_displayWidth.toStringAsFixed(1)}x${_displayHeight.toStringAsFixed(1)}, offset: (${_offsetX.toStringAsFixed(1)}, ${_offsetY.toStringAsFixed(1)})');
+    } catch (e) {
+      debugPrint('Error calculating display dimensions: $e');
+      // Fallback to full constraints if calculation fails
+      _displayWidth = constraints.maxWidth;
+      _displayHeight = constraints.maxHeight;
+      _offsetX = 0;
+      _offsetY = 0;
+    }
+  }
+
+  // Optimized validation with early returns
+  bool _isValidTapPosition(double x, double y) {
+    return x >= 0 && x <= _displayWidth && y >= 0 && y <= _displayHeight;
+  }
+
+  // Optimized document loading callback
+  void _onDocumentLoaded(PdfDocumentLoadedDetails details) {
+    setState(() {
+      _documentLoaded = true;
+      _totalPages = details.document.pages.count;
+      
+      // Get page dimensions from the first page
+      final page = details.document.pages[0];
+      _pdfPageWidth = page.size.width;
+      _pdfPageHeight = page.size.height;
+      
+      // Reset dimensions cache when new document loads
+      _dimensionsCalculated = false;
+    });
+    
+    debugPrint('PDF loaded: ${_totalPages} pages, size: ${_pdfPageWidth.toStringAsFixed(1)}x${_pdfPageHeight.toStringAsFixed(1)}');
+  }
+
+  // Optimized page change callback
+  void _onPageChanged(int page) {
+    if (_currentPage != page) {
+      setState(() {
+        _currentPage = page;
+      });
+    }
   }
 
   @override
@@ -163,31 +242,18 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
                 borderRadius: BorderRadius.circular(12),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
+                    // Calculate dimensions once for this build
+                    if (_documentLoaded) {
+                      _calculateDisplayDimensions(constraints);
+                    }
+                    
                     return Stack(
                       children: [
                         SfPdfViewer.file(
                           widget.pdfFile,
                           controller: _pdfViewerController,
-                          onDocumentLoaded: (PdfDocumentLoadedDetails details) {
-                            setState(() {
-                              _totalPages = details.document.pages.count;
-                              _documentLoaded = true;
-                              
-                              // Get actual PDF page dimensions (in points)
-                              if (details.document.pages.count > 0) {
-                                final page = details.document.pages[0];
-                                _pdfPageWidth = page.size.width;
-                                _pdfPageHeight = page.size.height;
-                              }
-                            });
-                            
-                                                          // PDF loaded successfully with dimensions and page count
-                          },
-                          onPageChanged: (PdfPageChangedDetails details) {
-                            setState(() {
-                              _currentPage = details.newPageNumber;
-                            });
-                          },
+                          onDocumentLoaded: _onDocumentLoaded,
+                          onPageChanged: (PdfPageChangedDetails details) => _onPageChanged(details.newPageNumber),
                         ),
                         // Overlay for tap detection
                         if (_documentLoaded)
@@ -203,11 +269,13 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
                           ),
                         // Signature position indicator
                         if (_selectedPosition != null &&
-                            _selectedPosition!.pageNumber == _currentPage)
+                            _selectedPosition!.pageNumber == _currentPage &&
+                            _dimensionsCalculated)
                           Positioned(
                             left: _selectedPosition!.x - 25,
                             top: _selectedPosition!.y - 25,
-                            child: Container(
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
                               width: 50,
                               height: 50,
                               decoration: BoxDecoration(
@@ -217,6 +285,13 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
                                   width: 2,
                                 ),
                                 borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppTheme.primaryCyan.withValues(alpha: 0.2),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
                               child: const Icon(
                                 Icons.draw,
@@ -338,53 +413,58 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
   }
 
   void _handleTap(TapDownDetails details, BoxConstraints constraints) {
+    // Debounce rapid taps to improve performance
+    final now = DateTime.now();
+    if (_lastTapTime != null && now.difference(_lastTapTime!) < _tapDebounceTime) {
+      return;
+    }
+    _lastTapTime = now;
+    
     if (!_documentLoaded) return;
     
-    final RenderBox renderBox = context.findRenderObject() as RenderBox;
-    final Offset localPosition = renderBox.globalToLocal(details.globalPosition);
-    
-    // Calculate the available area for PDF display
-    final double availableWidth = constraints.maxWidth;
-    final double availableHeight = constraints.maxHeight;
-    
-    // Calculate PDF display dimensions (accounting for aspect ratio preservation)
-    final double pdfAspectRatio = _pdfPageWidth / _pdfPageHeight;
-    final double availableAspectRatio = availableWidth / availableHeight;
-    
-    double displayWidth, displayHeight;
-    double offsetX = 0, offsetY = 0;
-    
-    if (pdfAspectRatio > availableAspectRatio) {
-      // PDF is wider - fit to width
-      displayWidth = availableWidth;
-      displayHeight = availableWidth / pdfAspectRatio;
-      offsetY = (availableHeight - displayHeight) / 2;
-    } else {
-      // PDF is taller - fit to height
-      displayHeight = availableHeight;
-      displayWidth = availableHeight * pdfAspectRatio;
-      offsetX = (availableWidth - displayWidth) / 2;
+    // Calculate dimensions only if not cached
+    if (!_dimensionsCalculated) {
+      _calculateDisplayDimensions(constraints);
     }
     
-    // Calculate relative position within the PDF display area
-    final double relativeX = localPosition.dx - offsetX;
-    final double relativeY = localPosition.dy - offsetY;
-    
-    // Check if tap is within PDF bounds
-    if (relativeX >= 0 && relativeX <= displayWidth && 
-        relativeY >= 0 && relativeY <= displayHeight) {
+    try {
+      // Get tap position relative to the PDF viewer widget
+      final double relativeX = details.localPosition.dx - _offsetX;
+      final double relativeY = details.localPosition.dy - _offsetY;
       
-      setState(() {
-        _selectedPosition = SignaturePosition(
-          x: relativeX,
-          y: relativeY,
-          pageNumber: _currentPage,
-          pdfWidth: _pdfPageWidth,
-          pdfHeight: _pdfPageHeight,
-          viewerWidth: displayWidth,
-          viewerHeight: displayHeight,
-        );
-              });
+      // Validate tap position with early return for performance
+      if (!_isValidTapPosition(relativeX, relativeY)) {
+        return;
+      }
+      
+      // Create signature position with optimized calculation
+      final newPosition = SignaturePosition(
+        x: relativeX,
+        y: relativeY,
+        pageNumber: _currentPage,
+        pdfWidth: _pdfPageWidth,
+        pdfHeight: _pdfPageHeight,
+        viewerWidth: _displayWidth,
+        viewerHeight: _displayHeight,
+      );
+      
+      // Update state only if position actually changed
+      if (_selectedPosition?.x != relativeX || 
+          _selectedPosition?.y != relativeY || 
+          _selectedPosition?.pageNumber != _currentPage) {
+        setState(() {
+          _selectedPosition = newPosition;
+        });
+        
+        // Provide haptic feedback for better UX
+        try {
+          HapticFeedback.lightImpact();
+        } catch (e) {
+          // Ignore haptic feedback errors on unsupported platforms
+        }
+      }
+    } catch (e) {
+      debugPrint('Error handling tap: $e');
     }
   }
 

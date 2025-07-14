@@ -6,6 +6,8 @@ class UserPreferencesService {
   static const String _keySignerId = 'signer_id';
   static const String _keyLocation = 'location';
   static const String _keyReason = 'reason';
+  static const String _keyEnableTimestamp = 'enable_timestamp';
+  static const String _keyTsaServer = 'tsa_server';
 
   static Future<void> setRememberData(bool remember) async {
     final prefs = await SharedPreferences.getInstance();
@@ -22,12 +24,20 @@ class UserPreferencesService {
     required String signerId,
     required String location,
     required String reason,
+    String? enableTimestamp,
+    String? tsaServer,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keySignerName, signerName);
     await prefs.setString(_keySignerId, signerId);
     await prefs.setString(_keyLocation, location);
     await prefs.setString(_keyReason, reason);
+    if (enableTimestamp != null) {
+      await prefs.setString(_keyEnableTimestamp, enableTimestamp);
+    }
+    if (tsaServer != null) {
+      await prefs.setString(_keyTsaServer, tsaServer);
+    }
   }
 
   static Future<Map<String, String>> getUserData() async {
@@ -37,6 +47,8 @@ class UserPreferencesService {
       'signerId': prefs.getString(_keySignerId) ?? '',
       'location': prefs.getString(_keyLocation) ?? 'Ecuador',
       'reason': prefs.getString(_keyReason) ?? 'Firma digital',
+      'enableTimestamp': prefs.getString(_keyEnableTimestamp) ?? 'false',
+      'tsaServer': prefs.getString(_keyTsaServer) ?? 'https://freetsa.org/tsr',
     };
   }
 
@@ -46,5 +58,7 @@ class UserPreferencesService {
     await prefs.remove(_keySignerId);
     await prefs.remove(_keyLocation);
     await prefs.remove(_keyReason);
+    await prefs.remove(_keyEnableTimestamp);
+    await prefs.remove(_keyTsaServer);
   }
 } 
