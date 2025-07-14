@@ -59,6 +59,9 @@ Documentación específica del frontend Flutter:
 - ✅ Previsualización de documentos PDF
 - ✅ Selección visual de posición de firma
 - ✅ **Posicionamiento preciso de firma digital** (Enero 2025)
+- ✅ **Sistema TSA robusto con fallbacks** (Julio 2025)
+- ✅ **Gestión avanzada de PDFs firmados** (Julio 2025)
+- ✅ **Visualización de timestamps reales** (Julio 2025)
 - ✅ Persistencia de datos del usuario
 - ✅ Monitoreo automático del servidor (cada 2 minutos)
 - ✅ Eliminación del campo email del formulario
@@ -87,5 +90,5 @@ Seguimos el formato estándar ADR:
 
 ---
 
-📝 **Última actualización**: Enero 2025  
+📝 **Última actualización**: Julio 2025  
 👥 **Mantenido por**: Equipo de Desarrollo Firmador 
