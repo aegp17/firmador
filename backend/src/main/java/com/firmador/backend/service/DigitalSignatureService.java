@@ -1,141 +1,146 @@
 package com.firmador.backend.service;
 
-import com.firmador.backend.dto.CertificateInfo;
 import com.firmador.backend.dto.SignatureRequest;
-import com.firmador.backend.dto.SignatureResponse;
-import com.itextpdf.kernel.pdf.PdfDocument;
+import com.firmador.backend.dto.CertificateInfo;
 import com.itextpdf.kernel.pdf.PdfReader;
-import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.kernel.pdf.StampingProperties;
-import com.itextpdf.signatures.*;
 import com.itextpdf.kernel.geom.Rectangle;
+import com.itextpdf.signatures.*;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.security.KeyStore;
-import java.security.PrivateKey;
-import java.security.Security;
+import java.security.*;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.time.format.DateTimeFormatter;
 
 @Service
 public class DigitalSignatureService {
-
+    
     static {
         Security.addProvider(new BouncyCastleProvider());
     }
 
-    private final CertificateService certificateService;
-    private final DocumentStorageService documentStorageService;
+    private static final Logger logger = LoggerFactory.getLogger(DigitalSignatureService.class);
 
-    public DigitalSignatureService(CertificateService certificateService, 
-                                  DocumentStorageService documentStorageService) {
+    private final CertificateService certificateService;
+
+    public DigitalSignatureService(CertificateService certificateService) {
         this.certificateService = certificateService;
-        this.documentStorageService = documentStorageService;
     }
 
-    public SignatureResponse signDocument(byte[] documentData, SignatureRequest signatureRequest) {
+    /**
+     * Creates a TSA client for timestamping
+     */
+    private ITSAClient createTSAClient(String timestampUrl) {
+        if (timestampUrl == null || timestampUrl.trim().isEmpty()) {
+            return null;
+        }
+        
         try {
-            // Load certificate and private key
-            KeyStore keyStore = loadKeyStore(signatureRequest.getCertificateData(), 
-                                           signatureRequest.getCertificatePassword());
-            
-            String alias = keyStore.aliases().nextElement();
-            PrivateKey privateKey = (PrivateKey) keyStore.getKey(alias, 
-                                                                signatureRequest.getCertificatePassword().toCharArray());
-            Certificate[] chain = keyStore.getCertificateChain(alias);
-            X509Certificate certificate = (X509Certificate) chain[0];
-
-            // Create signed PDF
-            byte[] signedPdfData = createSignedPdf(documentData, privateKey, chain, signatureRequest, certificate);
-
-            // Generate response
-            String documentId = UUID.randomUUID().toString();
-            String filename = "signed_document_" + System.currentTimeMillis() + ".pdf";
-            
-            // Store signed document
-            documentStorageService.storeDocument(documentId, signedPdfData, filename, "application/pdf");
-            
-            SignatureResponse response = new SignatureResponse(
-                true, 
-                "Documento firmado exitosamente",
-                documentId,
-                filename,
-                LocalDateTime.now(),
-                signatureRequest.getSignerName(),
-                signatureRequest.getLocation(),
-                signatureRequest.getReason(),
-                signedPdfData.length,
-                "/api/signature/download/" + documentId
-            );
-
-            return response;
-
+            logger.info("Creating TSA client for URL: {}", timestampUrl);
+            return new TSAClientBouncyCastle(timestampUrl);
         } catch (Exception e) {
-            return new SignatureResponse(false, "Error al firmar el documento: " + e.getMessage());
+            logger.error("Failed to create TSA client for URL: {}", timestampUrl, e);
+            return null;
         }
     }
 
-    private byte[] createSignedPdf(byte[] documentData, PrivateKey privateKey, Certificate[] chain, 
-                                  SignatureRequest signatureRequest, X509Certificate certificate) throws Exception {
-        
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        PdfReader reader = new PdfReader(new ByteArrayInputStream(documentData));
-        StampingProperties properties = new StampingProperties().useAppendMode();
-        
-        // Create PDF signer - this will handle the PdfDocument internally
-        PdfSigner signer = new PdfSigner(reader, outputStream, properties);
-        
-        // Get signature appearance
+    /**
+     * Configure signature appearance
+     */
+    private void configureSignatureAppearance(PdfSigner signer, SignatureRequest request) {
+        // Configure signature appearance based on request parameters
         PdfSignatureAppearance appearance = signer.getSignatureAppearance();
         
-        // Configure signature appearance
-        appearance.setReason(signatureRequest.getReason());
-        appearance.setLocation(signatureRequest.getLocation());
-        appearance.setSignatureCreator("Firmador App");
+        // Set signature text
+        appearance.setLayer2Text(String.format(
+            "Firmado por: %s\nFecha: %s\nUbicación: %s\nRazón: %s",
+            request.getSignerName(),
+            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+            request.getLocation(),
+            request.getReason()
+        ));
         
-        // Set signature rectangle
-        Rectangle signatureRect = new Rectangle(
-            signatureRequest.getSignatureX().floatValue(), 
-            signatureRequest.getSignatureY().floatValue(), 
-            signatureRequest.getSignatureWidth().floatValue(), 
-            signatureRequest.getSignatureHeight().floatValue()
-        );
-        appearance.setPageRect(signatureRect).setPageNumber(signatureRequest.getSignaturePage());
+        // Set signature rectangle (position and size)
+        appearance.setPageRect(new Rectangle(
+            request.getSignatureX().floatValue(),
+            request.getSignatureY().floatValue(),
+            request.getSignatureWidth().floatValue(),
+            request.getSignatureHeight().floatValue()
+        ));
         
-        // Create signature text
-        String signatureText = createSignatureText(signatureRequest, certificate);
-        appearance.setLayer2Text(signatureText);
+        // Set signature page
+        appearance.setPageNumber(request.getSignaturePage());
         
-        // Create external signature container
-        IExternalSignature pks = new PrivateKeySignature(privateKey, DigestAlgorithms.SHA256, 
-                                                        BouncyCastleProvider.PROVIDER_NAME);
-        IExternalDigest digest = new BouncyCastleDigest();
-        
-        // Sign the document
-        signer.signDetached(digest, pks, chain, null, null, null, 0, 
-                           PdfSigner.CryptoStandard.CMS);
-        
-        return outputStream.toByteArray();
+        // Configure appearance mode
+        appearance.setRenderingMode(PdfSignatureAppearance.RenderingMode.DESCRIPTION);
     }
 
-    private String createSignatureText(SignatureRequest signatureRequest, X509Certificate certificate) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Firmado digitalmente por:\n");
-        sb.append(signatureRequest.getSignerName()).append("\n");
-        sb.append("ID: ").append(signatureRequest.getSignerId()).append("\n");
-        sb.append("Fecha: ").append(new Date()).append("\n");
-        sb.append("Ubicación: ").append(signatureRequest.getLocation()).append("\n");
-        sb.append("Razón: ").append(signatureRequest.getReason()).append("\n");
-        sb.append("Certificado: ").append(certificate.getSubjectDN().getName());
-        return sb.toString();
+    public byte[] signPdf(byte[] pdfBytes, SignatureRequest request) {
+        try {
+            logger.info("Starting PDF signing process for signer: {}", request.getSignerName());
+            
+            // Load the PDF document
+            PdfReader reader = new PdfReader(new ByteArrayInputStream(pdfBytes));
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            
+            // Create signed PDF with external container
+            PdfSigner signer = new PdfSigner(reader, outputStream, new StampingProperties());
+            
+            // Configure signature appearance
+            configureSignatureAppearance(signer, request);
+            
+            // Load certificate and private key
+            KeyStore keystore = loadKeyStore(request.getCertificateData(), request.getCertificatePassword());
+            String alias = keystore.aliases().nextElement();
+            PrivateKey privateKey = (PrivateKey) keystore.getKey(alias, request.getCertificatePassword().toCharArray());
+            Certificate[] certificateChain = keystore.getCertificateChain(alias);
+            
+            logger.info("Certificate loaded successfully for alias: {}", alias);
+            
+            // Create external signature container
+            IExternalSignature externalSignature = new PrivateKeySignature(privateKey, DigestAlgorithms.SHA256, "BC");
+            
+            // Create TSA client if timestamping is enabled
+            ITSAClient tsaClient = null;
+            if (Boolean.TRUE.equals(request.getEnableTimestamp())) {
+                tsaClient = createTSAClient(request.getTimestampServerUrl());
+                if (tsaClient != null) {
+                    logger.info("Timestamping enabled with server: {}", request.getTimestampServerUrl());
+                } else {
+                    logger.warn("Failed to create TSA client, signing without timestamp");
+                }
+            } else {
+                logger.info("Timestamping disabled");
+            }
+            
+            // Sign the document with proper parameters
+            signer.signDetached(
+                new BouncyCastleDigest(),
+                externalSignature,
+                certificateChain,
+                null,  // CRL clients
+                null,  // OCSP client
+                tsaClient,
+                0,     // Estimated size
+                PdfSigner.CryptoStandard.CMS
+            );
+            
+            logger.info("PDF signed successfully. Timestamping: {}", 
+                       tsaClient != null ? "enabled" : "disabled");
+            
+            return outputStream.toByteArray();
+            
+        } catch (Exception e) {
+            logger.error("Error signing PDF for signer: {}", request.getSignerName(), e);
+            throw new RuntimeException("Failed to sign PDF: " + e.getMessage(), e);
+        }
     }
 
     private KeyStore loadKeyStore(byte[] certificateData, String password) throws Exception {

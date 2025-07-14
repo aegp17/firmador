@@ -30,6 +30,10 @@ public class SignatureRequest {
     private Double signatureHeight = 50.0;
     private Integer signaturePage = 1;
     
+    // Timestamp settings
+    private Boolean enableTimestamp = false;
+    private String timestampServerUrl = "http://timestamp.digicert.com";
+    
     // Constructors
     public SignatureRequest() {}
     
@@ -131,5 +135,21 @@ public class SignatureRequest {
     
     public void setSignaturePage(Integer signaturePage) {
         this.signaturePage = signaturePage;
+    }
+    
+    public Boolean getEnableTimestamp() {
+        return enableTimestamp;
+    }
+    
+    public void setEnableTimestamp(Boolean enableTimestamp) {
+        this.enableTimestamp = enableTimestamp;
+    }
+    
+    public String getTimestampServerUrl() {
+        return timestampServerUrl;
+    }
+    
+    public void setTimestampServerUrl(String timestampServerUrl) {
+        this.timestampServerUrl = timestampServerUrl;
     }
 } 

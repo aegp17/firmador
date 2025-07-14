@@ -45,6 +45,8 @@ class BackendSignatureService {
     double signatureWidth = 150.0,
     double signatureHeight = 50.0,
     int signaturePage = 1,
+    bool enableTimestamp = false,
+    String timestampServerUrl = 'http://timestamp.digicert.com',
   }) async {
     try {
       // Create form data
@@ -63,12 +65,14 @@ class BackendSignatureService {
         'signerId': signerId,
         'location': location,
         'reason': reason,
-        'password': certificatePassword,
+        'certificatePassword': certificatePassword,
         'signatureX': signatureX,
         'signatureY': signatureY,
         'signatureWidth': signatureWidth,
         'signatureHeight': signatureHeight,
         'signaturePage': signaturePage,
+        'enableTimestamp': enableTimestamp,
+        'timestampServerUrl': timestampServerUrl,
       });
 
       // Send request

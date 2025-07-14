@@ -37,6 +37,29 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
   bool _isValidatingCertificate = false;
   bool _isCertificateValid = false;
   Timer? _healthCheckTimer;
+  
+  // Timestamp settings
+  bool _enableTimestamp = false;
+  String _selectedTsaServer = 'http://timestamp.digicert.com';
+  
+  final List<Map<String, String>> _tsaServers = [
+    {
+      'name': 'DigiCert (Recomendado)',
+      'url': 'http://timestamp.digicert.com',
+    },
+    {
+      'name': 'Apple',
+      'url': 'http://timestamp.apple.com/ts01',
+    },
+    {
+      'name': 'FreeTSA',
+      'url': 'https://freetsa.org/tsr',
+    },
+    {
+      'name': 'Certum',
+      'url': 'http://time.certum.pl',
+    },
+  ];
 
   @override
   void initState() {
@@ -98,6 +121,8 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
         _signerIdController.text = userData['signerId'] ?? '';
         _locationController.text = userData['location'] ?? 'Ecuador';
         _reasonController.text = userData['reason'] ?? 'Firma digital';
+        _enableTimestamp = userData['enableTimestamp'] == 'true';
+        _selectedTsaServer = userData['tsaServer'] ?? 'http://timestamp.digicert.com';
       });
     }
   }
@@ -110,6 +135,8 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
         signerId: _signerIdController.text,
         location: _locationController.text,
         reason: _reasonController.text,
+        enableTimestamp: _enableTimestamp.toString(),
+        tsaServer: _selectedTsaServer,
       );
     } else {
       await UserPreferencesService.clearUserData();
@@ -161,6 +188,8 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
                             const SizedBox(height: 20),
                           ],
                           _buildSignerInfoCard(),
+                          const SizedBox(height: 20),
+                          _buildTimestampConfigCard(),
                           const SizedBox(height: 20),
                           _buildRememberDataCard(),
                           const SizedBox(height: 32),
@@ -678,6 +707,117 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
     );
   }
 
+  Widget _buildTimestampConfigCard() {
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.access_time, color: AppTheme.primaryCyan, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'Estampado de Tiempo (Timestamp)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'El estampado de tiempo garantiza la fecha y hora exacta de la firma usando un servidor de confianza (TSA).',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.mediumGrey,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              title: const Text('Incluir Timestamp'),
+              subtitle: Text(
+                _enableTimestamp 
+                    ? 'La firma incluirá un timestamp criptográfico' 
+                    : 'Habilitar para agregar validez temporal',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _enableTimestamp ? AppTheme.success : AppTheme.mediumGrey,
+                ),
+              ),
+              value: _enableTimestamp,
+              onChanged: (bool value) {
+                setState(() {
+                  _enableTimestamp = value;
+                });
+              },
+              activeColor: AppTheme.primaryCyan,
+              secondary: Icon(
+                _enableTimestamp ? Icons.verified : Icons.schedule,
+                color: _enableTimestamp ? AppTheme.success : AppTheme.mediumGrey,
+              ),
+            ),
+            if (_enableTimestamp) ...[
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(
+                  labelText: 'Servidor de Timestamp (TSA)',
+                  border: OutlineInputBorder(),
+                  helperText: 'Selecciona un servidor de confianza',
+                ),
+                value: _selectedTsaServer,
+                items: _tsaServers.map((server) => DropdownMenuItem(
+                  value: server['url'],
+                  child: Text(server['name']!),
+                )).toList(),
+                onChanged: (String? newValue) {
+                  if (newValue != null) {
+                    setState(() {
+                      _selectedTsaServer = newValue;
+                    });
+                  }
+                },
+                validator: (value) {
+                  if (value == null) {
+                    return 'Por favor seleccione un servidor de timestamp';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryCyan.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.primaryCyan.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline, color: AppTheme.primaryCyan, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'El timestamp proporciona evidencia criptográfica de cuándo se firmó el documento.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.primaryCyan,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildRememberDataCard() {
     return Card(
       elevation: 4,
@@ -941,6 +1081,8 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
         signatureWidth: _signaturePosition!.signatureWidth,
         signatureHeight: _signaturePosition!.signatureHeight,
         signaturePage: _signaturePosition!.pageNumber,
+        enableTimestamp: _enableTimestamp,
+        timestampServerUrl: _selectedTsaServer,
       );
 
       if (result.success) {
@@ -977,6 +1119,20 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
             Text('Archivo: ${result.filename}'),
             Text('Tamaño: ${result.fileSize != null ? (result.fileSize! / 1024 / 1024).toStringAsFixed(2) : 'N/A'} MB'),
             Text('Firmado: ${result.signedAt.toString().split('.')[0]}'),
+            if (_enableTimestamp) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.access_time, color: AppTheme.success, size: 16),
+                  const SizedBox(width: 4),
+                  const Text('Timestamp incluido', style: TextStyle(color: AppTheme.success, fontWeight: FontWeight.w500)),
+                ],
+              ),
+              Text(
+                'Servidor: ${_getTsaServerName(_selectedTsaServer)}',
+                style: const TextStyle(fontSize: 12, color: AppTheme.mediumGrey)
+              ),
+            ],
           ],
         ),
         actions: [
@@ -1038,6 +1194,19 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
           ),
         );
       }
+    }
+  }
+
+  String _getTsaServerName(String url) {
+    try {
+      for (final server in _tsaServers) {
+        if (server['url'] == url) {
+          return server['name'] ?? 'Desconocido';
+        }
+      }
+      return 'Desconocido';
+    } catch (e) {
+      return 'Desconocido';
     }
   }
 } 
