@@ -209,168 +209,165 @@ bool PdfSigner::WritePdfFile(const std::string& filePath, const std::vector<BYTE
 
 std::vector<BYTE> PdfSigner::CreateSignature(const std::vector<BYTE>& dataToSign,
                                             CertificateManager& certManager) {
-    // Calculate hash of data to sign
-    std::vector<BYTE> hash = CalculateHash(dataToSign);
-    if (hash.empty()) {
-        return {};
-    }
-    
-    HCRYPTPROV cryptProv = certManager.GetPrivateKeyHandle();
-    if (!cryptProv) {
+    HCRYPTPROV hProv = certManager.GetPrivateKeyHandle();
+    if (!hProv) {
         std::cerr << "No private key available" << std::endl;
         return {};
     }
     
-    // Create hash object
-    HCRYPTHASH hHash;
-    if (!CryptCreateHash(cryptProv, CALG_SHA_256, 0, 0, &hHash)) {
-        std::cerr << "Failed to create hash object: " << GetLastError() << std::endl;
+    // Calculate hash of data
+    std::vector<BYTE> hash = CalculateHash(dataToSign);
+    if (hash.empty()) {
+        std::cerr << "Failed to calculate hash" << std::endl;
         return {};
     }
     
-    // Set hash value
-    if (!CryptSetHashParam(hHash, HP_HASHVAL, hash.data(), 0)) {
-        std::cerr << "Failed to set hash value: " << GetLastError() << std::endl;
-        CryptDestroyHash(hHash);
+    // Sign the hash
+    DWORD signatureLength = 0;
+    if (!CryptSignHash(reinterpret_cast<HCRYPTHASH>(hash.data()), AT_SIGNATURE, 
+                      nullptr, 0, nullptr, &signatureLength)) {
+        std::cerr << "Failed to get signature length: " << GetLastError() << std::endl;
         return {};
     }
     
-    // Get signature size
-    DWORD signatureSize = 0;
-    if (!CryptSignHash(hHash, AT_SIGNATURE, nullptr, 0, nullptr, &signatureSize)) {
-        std::cerr << "Failed to get signature size: " << GetLastError() << std::endl;
-        CryptDestroyHash(hHash);
-        return {};
-    }
-    
-    // Create signature
-    std::vector<BYTE> signature(signatureSize);
-    if (!CryptSignHash(hHash, AT_SIGNATURE, nullptr, 0, signature.data(), &signatureSize)) {
+    std::vector<BYTE> signature(signatureLength);
+    if (!CryptSignHash(reinterpret_cast<HCRYPTHASH>(hash.data()), AT_SIGNATURE, 
+                      nullptr, 0, signature.data(), &signatureLength)) {
         std::cerr << "Failed to create signature: " << GetLastError() << std::endl;
-        CryptDestroyHash(hHash);
         return {};
     }
     
-    CryptDestroyHash(hHash);
-    signature.resize(signatureSize);
+    signature.resize(signatureLength);
     return signature;
 }
 
 std::vector<BYTE> PdfSigner::AddSignatureToPdf(const std::vector<BYTE>& pdfData,
-                                              const std::vector<BYTE>& signature,
-                                              const SignaturePosition& position,
-                                              const std::vector<BYTE>& timestamp) {
-    // Simplified PDF signature addition - in a real implementation, 
-    // this would properly modify the PDF structure
+                                             const std::vector<BYTE>& signature,
+                                             const SignaturePosition& position,
+                                             const std::vector<BYTE>& timestamp) {
+    // Simplified PDF signature embedding
+    // In a real implementation, this would properly parse and modify the PDF structure
     
     std::vector<BYTE> signedPdf = pdfData;
     
-    // Find the end of the PDF (before %%EOF)
-    std::string pdfText(pdfData.begin(), pdfData.end());
-    size_t eofPos = pdfText.rfind("%%EOF");
+    // Find insertion point (before %%EOF)
+    std::string pdfString(signedPdf.begin(), signedPdf.end());
+    size_t eofPos = pdfString.rfind("%%EOF");
     if (eofPos == std::string::npos) {
-        return {}; // Invalid PDF
+        std::cerr << "Invalid PDF: no %%EOF found" << std::endl;
+        return {};
     }
     
-    // Create signature object (simplified)
-    std::stringstream sigObj;
-    sigObj << "\n\n% Digital Signature Object\n";
-    sigObj << "1000 0 obj\n";
-    sigObj << "<<\n";
-    sigObj << "/Type /Sig\n";
-    sigObj << "/Filter /Adobe.PPKLite\n";
-    sigObj << "/SubFilter /adbe.pkcs7.detached\n";
-    sigObj << "/ByteRange [0 " << eofPos << " " << (eofPos + 1000) << " 1000]\n";
-    sigObj << "/Contents <";
+    // Create signature dictionary (simplified)
+    std::stringstream sigDict;
+    sigDict << "\n";
+    sigDict << "1 0 obj\n";
+    sigDict << "<<\n";
+    sigDict << "/Type /Sig\n";
+    sigDict << "/Filter /Adobe.PPKLite\n";
+    sigDict << "/SubFilter /adbe.pkcs7.detached\n";
+    sigDict << "/Contents <";
     
-    // Add signature bytes as hex
+    // Add signature as hex
     for (BYTE b : signature) {
-        sigObj << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(b);
+        sigDict << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(b);
     }
     
+    // Add timestamp if available
     if (!timestamp.empty()) {
-        sigObj << ">\n/TimeStamp <";
+        sigDict << ">";
+        sigDict << "/M (D:" << GetCurrentTimestamp() << ")";
+        sigDict << "/Location (Windows Certificate Store)";
+        sigDict << "/Reason (Digital Signature)";
+        sigDict << "/ContactInfo (Firmador Windows)";
+        sigDict << "/Contents <";
         for (BYTE b : timestamp) {
-            sigObj << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(b);
+            sigDict << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(b);
         }
     }
     
-    sigObj << ">\n";
-    sigObj << "/M (D:" << GetCurrentTimestamp() << ")\n";
-    sigObj << "/Location (Windows)\n";
-    sigObj << "/Reason (Digital Signature)\n";
-    sigObj << ">>\nendobj\n\n";
+    sigDict << ">\n";
+    sigDict << ">>\n";
+    sigDict << "endobj\n";
     
-    // Insert signature object before %%EOF
-    std::string sigObjStr = sigObj.str();
-    signedPdf.insert(signedPdf.begin() + eofPos, sigObjStr.begin(), sigObjStr.end());
+    // Insert signature dictionary before %%EOF
+    std::string sigDictStr = sigDict.str();
+    signedPdf.insert(signedPdf.begin() + eofPos, sigDictStr.begin(), sigDictStr.end());
     
     return signedPdf;
 }
 
 std::string PdfSigner::GetCurrentTimestamp() {
-    std::time_t t = std::time(nullptr);
-    std::tm* tm = std::localtime(&t);
+    SYSTEMTIME st;
+    GetSystemTime(&st);
     
     std::stringstream ss;
-    ss << std::put_time(tm, "%Y%m%d%H%M%S");
+    ss << std::setfill('0')
+       << std::setw(4) << st.wYear
+       << std::setw(2) << st.wMonth
+       << std::setw(2) << st.wDay
+       << std::setw(2) << st.wHour
+       << std::setw(2) << st.wMinute
+       << std::setw(2) << st.wSecond
+       << "Z";
+    
     return ss.str();
 }
 
-std::vector<BYTE> PdfSigner::CalculateHash(const std::vector<BYTE>& data, const std::string& algorithm) {
+std::vector<BYTE> PdfSigner::CalculateHash(const std::vector<BYTE>& data) {
     BCRYPT_ALG_HANDLE hAlg = nullptr;
     BCRYPT_HASH_HANDLE hHash = nullptr;
     std::vector<BYTE> hash;
     
-    // Open algorithm provider
+    // Open SHA256 algorithm provider
     NTSTATUS status = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_SHA256_ALGORITHM, nullptr, 0);
     if (!BCRYPT_SUCCESS(status)) {
-        return {};
+        std::cerr << "Failed to open algorithm provider: " << status << std::endl;
+        return hash;
     }
     
-    // Get hash object size
-    DWORD hashObjectSize = 0;
-    DWORD dataSize = 0;
+    // Get hash object length
+    DWORD hashObjectLength = 0;
+    DWORD resultLength = 0;
     status = BCryptGetProperty(hAlg, BCRYPT_OBJECT_LENGTH, 
-                              reinterpret_cast<PUCHAR>(&hashObjectSize), 
-                              sizeof(hashObjectSize), &dataSize, 0);
+                              reinterpret_cast<PUCHAR>(&hashObjectLength), 
+                              sizeof(hashObjectLength), &resultLength, 0);
     if (!BCRYPT_SUCCESS(status)) {
         BCryptCloseAlgorithmProvider(hAlg, 0);
-        return {};
+        return hash;
     }
     
-    // Get hash size
-    DWORD hashSize = 0;
+    // Get hash length
+    DWORD hashLength = 0;
     status = BCryptGetProperty(hAlg, BCRYPT_HASH_LENGTH, 
-                              reinterpret_cast<PUCHAR>(&hashSize), 
-                              sizeof(hashSize), &dataSize, 0);
+                              reinterpret_cast<PUCHAR>(&hashLength), 
+                              sizeof(hashLength), &resultLength, 0);
     if (!BCRYPT_SUCCESS(status)) {
         BCryptCloseAlgorithmProvider(hAlg, 0);
-        return {};
+        return hash;
     }
     
-    // Allocate hash object
-    std::vector<BYTE> hashObject(hashObjectSize);
-    
-    // Create hash
-    status = BCryptCreateHash(hAlg, &hHash, hashObject.data(), hashObjectSize, nullptr, 0, 0);
+    // Create hash object
+    std::vector<BYTE> hashObject(hashObjectLength);
+    status = BCryptCreateHash(hAlg, &hHash, hashObject.data(), hashObjectLength, 
+                             nullptr, 0, 0);
     if (!BCRYPT_SUCCESS(status)) {
         BCryptCloseAlgorithmProvider(hAlg, 0);
-        return {};
+        return hash;
     }
     
-    // Hash data
+    // Hash the data
     status = BCryptHashData(hHash, const_cast<PUCHAR>(data.data()), 
                            static_cast<ULONG>(data.size()), 0);
     if (!BCRYPT_SUCCESS(status)) {
         BCryptDestroyHash(hHash);
         BCryptCloseAlgorithmProvider(hAlg, 0);
-        return {};
+        return hash;
     }
     
-    // Finalize hash
-    hash.resize(hashSize);
-    status = BCryptFinishHash(hHash, hash.data(), hashSize, 0);
+    // Get the hash result
+    hash.resize(hashLength);
+    status = BCryptFinishHash(hHash, hash.data(), hashLength, 0);
     if (!BCRYPT_SUCCESS(status)) {
         BCryptDestroyHash(hHash);
         BCryptCloseAlgorithmProvider(hAlg, 0);

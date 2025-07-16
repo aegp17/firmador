@@ -49,10 +49,9 @@ TSAResponse TSAClient::GetTimestamp(const std::vector<BYTE>& messageHash,
             response.serverUsed = server.name;
             std::cout << "Successfully obtained timestamp from: " << server.name << std::endl;
             return response;
+        } else {
+            std::cout << "Failed to get timestamp from " << server.name << ": " << response.errorMessage << std::endl;
         }
-        
-        std::cout << "Failed to get timestamp from " << server.name 
-                  << ": " << response.errorMessage << std::endl;
     }
     
     // All servers failed
@@ -75,51 +74,88 @@ bool TSAClient::TestTSAServer(const TSAServer& server) const {
         return false;
     }
     
-    // Convert URL to wide string
+    // Parse URL
     std::wstring wUrl(server.url.begin(), server.url.end());
     
-    HINTERNET hConnect = InternetOpenUrl(m_hInternet, wUrl.c_str(), 
-                                        nullptr, 0, 
-                                        INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE,
-                                        0);
+    URL_COMPONENTS urlComponents = {0};
+    urlComponents.dwStructSize = sizeof(urlComponents);
+    
+    // Set buffer sizes
+    wchar_t hostname[256];
+    wchar_t urlPath[256];
+    urlComponents.lpszHostName = hostname;
+    urlComponents.dwHostNameLength = sizeof(hostname) / sizeof(wchar_t);
+    urlComponents.lpszUrlPath = urlPath;
+    urlComponents.dwUrlPathLength = sizeof(urlPath) / sizeof(wchar_t);
+    
+    if (!InternetCrackUrl(wUrl.c_str(), 0, 0, &urlComponents)) {
+        return false;
+    }
+    
+    // Connect to server
+    HINTERNET hConnect = InternetConnect(
+        m_hInternet,
+        hostname,
+        urlComponents.nPort,
+        nullptr, nullptr,
+        INTERNET_SERVICE_HTTP,
+        0, 0
+    );
     
     if (!hConnect) {
         return false;
     }
     
-    // Check HTTP status
-    DWORD statusCode = 0;
-    DWORD statusCodeSize = sizeof(statusCode);
+    // Test connection with HEAD request
+    HINTERNET hRequest = HttpOpenRequest(
+        hConnect,
+        L"HEAD",
+        urlPath,
+        nullptr, nullptr, nullptr,
+        urlComponents.nScheme == INTERNET_SCHEME_HTTPS ? INTERNET_FLAG_SECURE : 0,
+        0
+    );
     
-    bool success = HttpQueryInfo(hConnect, 
-                                HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER,
-                                &statusCode, &statusCodeSize, nullptr) != FALSE;
+    bool result = false;
+    if (hRequest) {
+        if (HttpSendRequest(hRequest, nullptr, 0, nullptr, 0)) {
+            DWORD statusCode;
+            DWORD statusCodeSize = sizeof(statusCode);
+            
+            if (HttpQueryInfo(hRequest, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER,
+                             &statusCode, &statusCodeSize, nullptr)) {
+                // Accept various status codes as "alive"
+                result = (statusCode == 200 || statusCode == 405 || statusCode == 400);
+            }
+        }
+        InternetCloseHandle(hRequest);
+    }
     
     InternetCloseHandle(hConnect);
-    
-    return success && (statusCode == 200 || statusCode == 405); // 405 is expected for GET on TSA endpoint
+    return result;
 }
 
 TSAResponse TSAClient::RequestTimestampFromServer(const TSAServer& server, 
                                                 const std::vector<BYTE>& tsaRequest) {
     TSAResponse response = {};
+    response.success = false;
     
-    try {
-        std::vector<BYTE> responseData = HttpPostRequest(server.url, tsaRequest, 
-                                                       response.httpStatusCode);
-        
-        if (response.httpStatusCode == 200 && !responseData.empty()) {
-            response.success = true;
-            response.timestampData = responseData;
-            response.serverUsed = server.name;
-        } else {
-            response.success = false;
-            response.errorMessage = "HTTP " + std::to_string(response.httpStatusCode);
-        }
-    } catch (const std::exception& e) {
-        response.success = false;
-        response.errorMessage = e.what();
+    // Make HTTP POST request
+    std::vector<BYTE> responseData = HttpPostRequest(server.url, tsaRequest, response.httpStatusCode);
+    
+    if (responseData.empty()) {
+        response.errorMessage = "Failed to send TSA request to " + server.name;
+        return response;
     }
+    
+    if (response.httpStatusCode != 200) {
+        response.errorMessage = "TSA server returned HTTP " + std::to_string(response.httpStatusCode);
+        return response;
+    }
+    
+    response.success = true;
+    response.timestampData = responseData;
+    response.serverUsed = server.name;
     
     return response;
 }
@@ -127,51 +163,51 @@ TSAResponse TSAClient::RequestTimestampFromServer(const TSAServer& server,
 std::vector<BYTE> TSAClient::CreateTSARequest(const std::vector<BYTE>& messageHash, 
                                             const std::string& hashAlgorithm) {
     // Simplified TSA request creation
-    // In a full implementation, this would create a proper ASN.1 TSRequest structure
+    // In a full implementation, this would create a proper RFC 3161 TSA request
     
+    std::vector<BYTE> tsaRequest;
+    
+    // TSA Request structure (simplified)
+    // This is a minimal implementation - a full version would use ASN.1 encoding
+    
+    // Add TSA request header (simplified)
+    std::string requestHeader = "TSA_REQUEST_V1\n";
+    tsaRequest.insert(tsaRequest.end(), requestHeader.begin(), requestHeader.end());
+    
+    // Add hash algorithm
+    std::string algLine = "ALGORITHM:" + hashAlgorithm + "\n";
+    tsaRequest.insert(tsaRequest.end(), algLine.begin(), algLine.end());
+    
+    // Add message hash (hex encoded)
+    std::string hashLine = "HASH:";
+    tsaRequest.insert(tsaRequest.end(), hashLine.begin(), hashLine.end());
+    
+    // Convert hash to hex
+    for (BYTE b : messageHash) {
+        char hex[3];
+        sprintf_s(hex, "%02x", b);
+        tsaRequest.push_back(hex[0]);
+        tsaRequest.push_back(hex[1]);
+    }
+    
+    tsaRequest.push_back('\n');
+    
+    // Add random nonce
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(0, 255);
     
-    std::vector<BYTE> tsaRequest;
+    std::string nonceLine = "NONCE:";
+    tsaRequest.insert(tsaRequest.end(), nonceLine.begin(), nonceLine.end());
     
-    // Add a simple header (this is a placeholder - real implementation needs proper ASN.1)
-    tsaRequest.push_back(0x30); // SEQUENCE
-    tsaRequest.push_back(0x82); // Length (long form)
-    
-    // Add version
-    tsaRequest.push_back(0x02); // INTEGER
-    tsaRequest.push_back(0x01); // Length
-    tsaRequest.push_back(0x01); // Version 1
-    
-    // Add message imprint
-    tsaRequest.push_back(0x30); // SEQUENCE
-    tsaRequest.push_back(static_cast<BYTE>(messageHash.size() + 10)); // Length estimate
-    
-    // Add hash algorithm (simplified)
-    tsaRequest.push_back(0x30); // SEQUENCE
-    tsaRequest.push_back(0x07); // Length
-    tsaRequest.push_back(0x06); // OID
-    tsaRequest.push_back(0x05); // Length
-    // SHA256 OID simplified
-    tsaRequest.insert(tsaRequest.end(), {0x2B, 0x0E, 0x03, 0x02, 0x1A});
-    
-    // Add hash value
-    tsaRequest.push_back(0x04); // OCTET STRING
-    tsaRequest.push_back(static_cast<BYTE>(messageHash.size())); // Length
-    tsaRequest.insert(tsaRequest.end(), messageHash.begin(), messageHash.end());
-    
-    // Add nonce (random)
-    tsaRequest.push_back(0x02); // INTEGER
-    tsaRequest.push_back(0x08); // Length (8 bytes)
     for (int i = 0; i < 8; ++i) {
-        tsaRequest.push_back(static_cast<BYTE>(dis(gen)));
+        char hex[3];
+        sprintf_s(hex, "%02x", dis(gen));
+        tsaRequest.push_back(hex[0]);
+        tsaRequest.push_back(hex[1]);
     }
     
-    // Update length field
-    size_t totalLength = tsaRequest.size() - 3;
-    tsaRequest[2] = static_cast<BYTE>((totalLength >> 8) & 0xFF);
-    tsaRequest.insert(tsaRequest.begin() + 3, static_cast<BYTE>(totalLength & 0xFF));
+    tsaRequest.push_back('\n');
     
     return tsaRequest;
 }
@@ -179,150 +215,166 @@ std::vector<BYTE> TSAClient::CreateTSARequest(const std::vector<BYTE>& messageHa
 std::vector<BYTE> TSAClient::HttpPostRequest(const std::string& url, 
                                            const std::vector<BYTE>& postData,
                                            int& httpStatusCode) {
-    std::vector<BYTE> responseData;
+    std::vector<BYTE> response;
     httpStatusCode = 0;
     
-    // Parse URL
-    std::string scheme, host, path;
-    INTERNET_PORT port = INTERNET_DEFAULT_HTTPS_PORT;
-    
-    if (url.find("https://") == 0) {
-        size_t hostStart = 8;
-        size_t pathStart = url.find('/', hostStart);
-        host = url.substr(hostStart, pathStart - hostStart);
-        path = url.substr(pathStart);
-        port = INTERNET_DEFAULT_HTTPS_PORT;
-    } else if (url.find("http://") == 0) {
-        size_t hostStart = 7;
-        size_t pathStart = url.find('/', hostStart);
-        host = url.substr(hostStart, pathStart - hostStart);
-        path = url.substr(pathStart);
-        port = INTERNET_DEFAULT_HTTP_PORT;
-    } else {
-        throw std::runtime_error("Unsupported URL scheme");
+    if (!m_hInternet) {
+        return response;
     }
     
-    // Convert to wide strings
-    std::wstring wHost(host.begin(), host.end());
-    std::wstring wPath(path.begin(), path.end());
+    // Convert URL to wide string
+    std::wstring wUrl(url.begin(), url.end());
+    
+    // Parse URL
+    URL_COMPONENTS urlComponents = {0};
+    urlComponents.dwStructSize = sizeof(urlComponents);
+    
+    wchar_t hostname[256];
+    wchar_t urlPath[256];
+    urlComponents.lpszHostName = hostname;
+    urlComponents.dwHostNameLength = sizeof(hostname) / sizeof(wchar_t);
+    urlComponents.lpszUrlPath = urlPath;
+    urlComponents.dwUrlPathLength = sizeof(urlPath) / sizeof(wchar_t);
+    
+    if (!InternetCrackUrl(wUrl.c_str(), 0, 0, &urlComponents)) {
+        return response;
+    }
     
     // Connect to server
-    HINTERNET hConnect = InternetConnect(m_hInternet, wHost.c_str(), port,
-                                        nullptr, nullptr, INTERNET_SERVICE_HTTP, 0, 0);
+    HINTERNET hConnect = InternetConnect(
+        m_hInternet,
+        hostname,
+        urlComponents.nPort,
+        nullptr, nullptr,
+        INTERNET_SERVICE_HTTP,
+        0, 0
+    );
+    
     if (!hConnect) {
-        throw std::runtime_error("Failed to connect to server: " + GetLastWinInetError());
+        return response;
     }
     
-    // Create request
-    DWORD flags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE;
-    if (port == INTERNET_DEFAULT_HTTPS_PORT) {
-        flags |= INTERNET_FLAG_SECURE;
-    }
+    // Open HTTP request
+    DWORD flags = urlComponents.nScheme == INTERNET_SCHEME_HTTPS ? 
+                  INTERNET_FLAG_SECURE : 0;
     
-    HINTERNET hRequest = HttpOpenRequest(hConnect, L"POST", wPath.c_str(),
-                                        nullptr, nullptr, nullptr, flags, 0);
+    HINTERNET hRequest = HttpOpenRequest(
+        hConnect,
+        L"POST",
+        urlPath,
+        nullptr, nullptr, nullptr,
+        flags,
+        0
+    );
+    
     if (!hRequest) {
         InternetCloseHandle(hConnect);
-        throw std::runtime_error("Failed to create HTTP request: " + GetLastWinInetError());
+        return response;
     }
     
     // Set headers
     std::wstring headers = L"Content-Type: application/timestamp-query\r\n";
-    if (!HttpAddRequestHeaders(hRequest, headers.c_str(), -1, 
-                              HTTP_ADDREQ_FLAG_ADD | HTTP_ADDREQ_FLAG_REPLACE)) {
-        InternetCloseHandle(hRequest);
-        InternetCloseHandle(hConnect);
-        throw std::runtime_error("Failed to add headers: " + GetLastWinInetError());
-    }
     
     // Send request
-    BOOL success = HttpSendRequest(hRequest, nullptr, 0, 
-                                  const_cast<BYTE*>(postData.data()), 
-                                  static_cast<DWORD>(postData.size()));
-    if (!success) {
-        InternetCloseHandle(hRequest);
-        InternetCloseHandle(hConnect);
-        throw std::runtime_error("Failed to send request: " + GetLastWinInetError());
-    }
+    BOOL requestSent = HttpSendRequest(
+        hRequest,
+        headers.c_str(),
+        static_cast<DWORD>(headers.length()),
+        const_cast<BYTE*>(postData.data()),
+        static_cast<DWORD>(postData.size())
+    );
     
-    // Get status code
-    DWORD statusCode = 0;
-    DWORD statusCodeSize = sizeof(statusCode);
-    HttpQueryInfo(hRequest, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER,
-                 &statusCode, &statusCodeSize, nullptr);
-    httpStatusCode = static_cast<int>(statusCode);
-    
-    // Read response
-    DWORD bytesAvailable = 0;
-    while (InternetQueryDataAvailable(hRequest, &bytesAvailable, 0, 0) && bytesAvailable > 0) {
-        std::vector<BYTE> buffer(bytesAvailable);
-        DWORD bytesRead = 0;
+    if (requestSent) {
+        // Get status code
+        DWORD statusCode;
+        DWORD statusCodeSize = sizeof(statusCode);
         
-        if (InternetReadFile(hRequest, buffer.data(), bytesAvailable, &bytesRead)) {
-            responseData.insert(responseData.end(), buffer.begin(), 
-                              buffer.begin() + bytesRead);
-        } else {
-            break;
+        if (HttpQueryInfo(hRequest, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER,
+                         &statusCode, &statusCodeSize, nullptr)) {
+            httpStatusCode = static_cast<int>(statusCode);
+        }
+        
+        if (httpStatusCode == 200) {
+            // Read response
+            BYTE buffer[4096];
+            DWORD bytesRead;
+            
+            while (InternetReadFile(hRequest, buffer, sizeof(buffer), &bytesRead) && bytesRead > 0) {
+                response.insert(response.end(), buffer, buffer + bytesRead);
+            }
         }
     }
     
     InternetCloseHandle(hRequest);
     InternetCloseHandle(hConnect);
     
-    return responseData;
+    return response;
 }
 
 void TSAClient::InitializeDefaultTSAServers() {
     m_tsaServers.clear();
     
-    // FreeTSA (Free)
-    TSAServer freeTsa = {};
-    freeTsa.url = "https://freetsa.org/tsr";
-    freeTsa.name = "FreeTSA";
-    freeTsa.requiresAuth = false;
-    m_tsaServers.push_back(freeTsa);
+    // Add default TSA servers with fallback support
+    TSAServer server1 = {};
+    server1.url = "https://freetsa.org/tsr";
+    server1.name = "FreeTSA";
+    server1.requiresAuth = false;
+    m_tsaServers.push_back(server1);
     
-    // DigiCert TSA
-    TSAServer digicert = {};
-    digicert.url = "http://timestamp.digicert.com";
-    digicert.name = "DigiCert";
-    digicert.requiresAuth = false;
-    m_tsaServers.push_back(digicert);
+    TSAServer server2 = {};
+    server2.url = "http://timestamp.digicert.com";
+    server2.name = "DigiCert";
+    server2.requiresAuth = false;
+    m_tsaServers.push_back(server2);
     
-    // Sectigo TSA
-    TSAServer sectigo = {};
-    sectigo.url = "http://timestamp.sectigo.com";
-    sectigo.name = "Sectigo";
-    sectigo.requiresAuth = false;
-    m_tsaServers.push_back(sectigo);
+    TSAServer server3 = {};
+    server3.url = "http://timestamp.sectigo.com";
+    server3.name = "Sectigo";
+    server3.requiresAuth = false;
+    m_tsaServers.push_back(server3);
     
-    // GlobalSign TSA
-    TSAServer globalsign = {};
-    globalsign.url = "http://timestamp.globalsign.com/scripts/timstamp.dll";
-    globalsign.name = "GlobalSign";
-    globalsign.requiresAuth = false;
-    m_tsaServers.push_back(globalsign);
+    TSAServer server4 = {};
+    server4.url = "http://timestamp.apple.com/ts01";
+    server4.name = "Apple";
+    server4.requiresAuth = false;
+    m_tsaServers.push_back(server4);
     
-    // Entrust TSA
-    TSAServer entrust = {};
-    entrust.url = "http://timestamp.entrust.net/TSS/RFC3161sha2TS";
-    entrust.name = "Entrust";
-    entrust.requiresAuth = false;
-    m_tsaServers.push_back(entrust);
+    TSAServer server5 = {};
+    server5.url = "http://time.certum.pl";
+    server5.name = "Certum";
+    server5.requiresAuth = false;
+    m_tsaServers.push_back(server5);
 }
 
 std::string TSAClient::GetLastWinInetError() const {
     DWORD error = GetLastError();
-    std::stringstream ss;
-    ss << "Error " << error;
     
-    if (error == ERROR_INTERNET_TIMEOUT) {
-        ss << " (Timeout)";
-    } else if (error == ERROR_INTERNET_NAME_NOT_RESOLVED) {
-        ss << " (Name not resolved)";
-    } else if (error == ERROR_INTERNET_CANNOT_CONNECT) {
-        ss << " (Cannot connect)";
+    LPWSTR errorMsg = nullptr;
+    DWORD length = FormatMessage(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+        nullptr,
+        error,
+        0,
+        reinterpret_cast<LPWSTR>(&errorMsg),
+        0,
+        nullptr
+    );
+    
+    std::string result;
+    if (length > 0 && errorMsg) {
+        // Convert to UTF-8
+        int utf8Length = WideCharToMultiByte(CP_UTF8, 0, errorMsg, length, nullptr, 0, nullptr, nullptr);
+        if (utf8Length > 0) {
+            std::vector<char> utf8Buffer(utf8Length);
+            WideCharToMultiByte(CP_UTF8, 0, errorMsg, length, utf8Buffer.data(), utf8Length, nullptr, nullptr);
+            result = std::string(utf8Buffer.data(), utf8Length);
+        }
+        LocalFree(errorMsg);
     }
     
-    return ss.str();
+    if (result.empty()) {
+        result = "Unknown WinINet error: " + std::to_string(error);
+    }
+    
+    return result;
 } 

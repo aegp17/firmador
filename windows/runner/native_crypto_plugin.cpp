@@ -114,6 +114,7 @@ void NativeCryptoPlugin::GetCertificateInfo(
     response[flutter::EncodableValue("thumbprint")] = flutter::EncodableValue(info.thumbprint);
     response[flutter::EncodableValue("isValid")] = flutter::EncodableValue(info.isValid);
     
+    // Convert key usage vector to list
     flutter::EncodableList keyUsageList;
     for (const auto& usage : info.keyUsage) {
         keyUsageList.push_back(flutter::EncodableValue(usage));
@@ -140,6 +141,7 @@ void NativeCryptoPlugin::GetAvailableCertificates(
         certMap[flutter::EncodableValue("thumbprint")] = flutter::EncodableValue(cert.thumbprint);
         certMap[flutter::EncodableValue("isValid")] = flutter::EncodableValue(cert.isValid);
         
+        // Convert key usage vector to list
         flutter::EncodableList keyUsageList;
         for (const auto& usage : cert.keyUsage) {
             keyUsageList.push_back(flutter::EncodableValue(usage));
@@ -165,14 +167,11 @@ void NativeCryptoPlugin::SignPdf(
     // Extract arguments
     auto pdfPath_it = args->find(flutter::EncodableValue("pdfPath"));
     auto outputPath_it = args->find(flutter::EncodableValue("outputPath"));
-    auto certPath_it = args->find(flutter::EncodableValue("certificatePath"));
-    auto password_it = args->find(flutter::EncodableValue("password"));
-    auto thumbprint_it = args->find(flutter::EncodableValue("thumbprint"));
     auto position_it = args->find(flutter::EncodableValue("position"));
-    auto includeTimestamp_it = args->find(flutter::EncodableValue("includeTimestamp"));
+    auto timestamp_it = args->find(flutter::EncodableValue("includeTimestamp"));
     
     if (pdfPath_it == args->end() || outputPath_it == args->end() || position_it == args->end()) {
-        result->Error("MISSING_ARGUMENTS", "pdfPath, outputPath, and position are required");
+        result->Error("MISSING_ARGUMENTS", "Required arguments: pdfPath, outputPath, position");
         return;
     }
     
@@ -185,8 +184,17 @@ void NativeCryptoPlugin::SignPdf(
         return;
     }
     
-    // Parse position
+    bool includeTimestamp = false;
+    if (timestamp_it != args->end()) {
+        const auto* timestampFlag = std::get_if<bool>(&timestamp_it->second);
+        if (timestampFlag) {
+            includeTimestamp = *timestampFlag;
+        }
+    }
+    
+    // Parse signature position
     SignaturePosition position = {};
+    
     auto x_it = positionMap->find(flutter::EncodableValue("x"));
     auto y_it = positionMap->find(flutter::EncodableValue("y"));
     auto page_it = positionMap->find(flutter::EncodableValue("pageNumber"));
@@ -194,46 +202,37 @@ void NativeCryptoPlugin::SignPdf(
     auto height_it = positionMap->find(flutter::EncodableValue("height"));
     
     if (x_it != positionMap->end()) {
-        if (const auto* x = std::get_if<double>(&x_it->second)) {
-            position.x = *x;
-        }
-    }
-    if (y_it != positionMap->end()) {
-        if (const auto* y = std::get_if<double>(&y_it->second)) {
-            position.y = *y;
-        }
-    }
-    if (page_it != positionMap->end()) {
-        if (const auto* page = std::get_if<int>(&page_it->second)) {
-            position.pageNumber = *page;
-        }
-    }
-    if (width_it != positionMap->end()) {
-        if (const auto* width = std::get_if<double>(&width_it->second)) {
-            position.width = *width;
-        } else {
-            position.width = 200.0; // Default width
-        }
-    }
-    if (height_it != positionMap->end()) {
-        if (const auto* height = std::get_if<double>(&height_it->second)) {
-            position.height = *height;
-        } else {
-            position.height = 50.0; // Default height
-        }
+        const auto* x = std::get_if<double>(&x_it->second);
+        if (x) position.x = *x;
     }
     
-    // Parse includeTimestamp
-    bool includeTimestamp = true;
-    if (includeTimestamp_it != args->end()) {
-        if (const auto* timestamp = std::get_if<bool>(&includeTimestamp_it->second)) {
-            includeTimestamp = *timestamp;
-        }
+    if (y_it != positionMap->end()) {
+        const auto* y = std::get_if<double>(&y_it->second);
+        if (y) position.y = *y;
+    }
+    
+    if (page_it != positionMap->end()) {
+        const auto* page = std::get_if<int>(&page_it->second);
+        if (page) position.pageNumber = *page;
+    }
+    
+    if (width_it != positionMap->end()) {
+        const auto* width = std::get_if<double>(&width_it->second);
+        if (width) position.width = *width;
+    }
+    
+    if (height_it != positionMap->end()) {
+        const auto* height = std::get_if<double>(&height_it->second);
+        if (height) position.height = *height;
     }
     
     // Load certificate
     CertificateManager certManager;
     bool loaded = false;
+    
+    auto certPath_it = args->find(flutter::EncodableValue("certificatePath"));
+    auto password_it = args->find(flutter::EncodableValue("password"));
+    auto thumbprint_it = args->find(flutter::EncodableValue("thumbprint"));
     
     if (thumbprint_it != args->end()) {
         const auto* thumbprint = std::get_if<std::string>(&thumbprint_it->second);
@@ -255,21 +254,22 @@ void NativeCryptoPlugin::SignPdf(
     
     // Sign PDF
     PdfSigner signer;
-    SigningResult signingResult = signer.SignPdf(*pdfPath, *outputPath, certManager, position, includeTimestamp);
+    SigningResult signingResult = signer.SignPdf(*pdfPath, *outputPath, certManager, 
+                                                position, includeTimestamp);
     
-    if (!signingResult.success) {
-        result->Error("SIGNING_FAILED", signingResult.errorMessage);
-        return;
-    }
-    
-    // Return success response
+    // Prepare response
     flutter::EncodableMap response;
-    response[flutter::EncodableValue("success")] = flutter::EncodableValue(true);
-    response[flutter::EncodableValue("signedPdfPath")] = flutter::EncodableValue(signingResult.signedPdfPath);
-    response[flutter::EncodableValue("timestampServer")] = flutter::EncodableValue(signingResult.timestampServer);
-    response[flutter::EncodableValue("signingTime")] = flutter::EncodableValue(signingResult.signingTime);
-    response[flutter::EncodableValue("originalSize")] = flutter::EncodableValue(static_cast<int64_t>(signingResult.originalSize));
-    response[flutter::EncodableValue("signedSize")] = flutter::EncodableValue(static_cast<int64_t>(signingResult.signedSize));
+    response[flutter::EncodableValue("success")] = flutter::EncodableValue(signingResult.success);
+    
+    if (signingResult.success) {
+        response[flutter::EncodableValue("signedPdfPath")] = flutter::EncodableValue(signingResult.signedPdfPath);
+        response[flutter::EncodableValue("timestampServer")] = flutter::EncodableValue(signingResult.timestampServer);
+        response[flutter::EncodableValue("signingTime")] = flutter::EncodableValue(signingResult.signingTime);
+        response[flutter::EncodableValue("originalSize")] = flutter::EncodableValue(static_cast<int64_t>(signingResult.originalSize));
+        response[flutter::EncodableValue("signedSize")] = flutter::EncodableValue(static_cast<int64_t>(signingResult.signedSize));
+    } else {
+        response[flutter::EncodableValue("errorMessage")] = flutter::EncodableValue(signingResult.errorMessage);
+    }
     
     result->Success(flutter::EncodableValue(response));
 }
@@ -281,16 +281,41 @@ void NativeCryptoPlugin::TestTSAConnectivity(
     std::vector<TSAServer> servers = tsaClient.GetAvailableTSAServers();
     
     flutter::EncodableList serverList;
+    
     for (const auto& server : servers) {
+        bool isAvailable = tsaClient.TestTSAServer(server);
+        
         flutter::EncodableMap serverMap;
         serverMap[flutter::EncodableValue("name")] = flutter::EncodableValue(server.name);
         serverMap[flutter::EncodableValue("url")] = flutter::EncodableValue(server.url);
-        serverMap[flutter::EncodableValue("available")] = flutter::EncodableValue(tsaClient.TestTSAServer(server));
+        serverMap[flutter::EncodableValue("available")] = flutter::EncodableValue(isAvailable);
+        serverMap[flutter::EncodableValue("requiresAuth")] = flutter::EncodableValue(server.requiresAuth);
         
         serverList.push_back(flutter::EncodableValue(serverMap));
     }
     
-    result->Success(flutter::EncodableValue(serverList));
+    flutter::EncodableMap response;
+    response[flutter::EncodableValue("servers")] = flutter::EncodableValue(serverList);
+    response[flutter::EncodableValue("totalServers")] = flutter::EncodableValue(static_cast<int>(servers.size()));
+    
+    // Count available servers
+    int availableCount = 0;
+    for (const auto& serverValue : serverList) {
+        const auto* serverMap = std::get_if<flutter::EncodableMap>(&serverValue);
+        if (serverMap) {
+            auto available_it = serverMap->find(flutter::EncodableValue("available"));
+            if (available_it != serverMap->end()) {
+                const auto* available = std::get_if<bool>(&available_it->second);
+                if (available && *available) {
+                    availableCount++;
+                }
+            }
+        }
+    }
+    
+    response[flutter::EncodableValue("availableServers")] = flutter::EncodableValue(availableCount);
+    
+    result->Success(flutter::EncodableValue(response));
 }
 
 void NativeCryptoPlugin::ValidatePdf(
@@ -305,7 +330,7 @@ void NativeCryptoPlugin::ValidatePdf(
     
     auto pdfPath_it = args->find(flutter::EncodableValue("pdfPath"));
     if (pdfPath_it == args->end()) {
-        result->Error("MISSING_ARGUMENTS", "pdfPath is required");
+        result->Error("MISSING_ARGUMENTS", "Required argument: pdfPath");
         return;
     }
     
@@ -317,17 +342,23 @@ void NativeCryptoPlugin::ValidatePdf(
     
     PdfSigner signer;
     bool isValid = signer.ValidatePdf(*pdfPath);
-    int pageCount = signer.GetPageCount(*pdfPath);
-    
-    double width, height;
-    bool hasDimensions = signer.GetPageDimensions(*pdfPath, 1, width, height);
     
     flutter::EncodableMap response;
     response[flutter::EncodableValue("isValid")] = flutter::EncodableValue(isValid);
-    response[flutter::EncodableValue("pageCount")] = flutter::EncodableValue(pageCount);
-    if (hasDimensions) {
-        response[flutter::EncodableValue("pageWidth")] = flutter::EncodableValue(width);
-        response[flutter::EncodableValue("pageHeight")] = flutter::EncodableValue(height);
+    
+    if (isValid) {
+        // Get additional PDF info
+        int pageCount = signer.GetPageCount(*pdfPath);
+        response[flutter::EncodableValue("pageCount")] = flutter::EncodableValue(pageCount);
+        
+        // Get dimensions of first page
+        double width, height;
+        if (signer.GetPageDimensions(*pdfPath, 1, width, height)) {
+            flutter::EncodableMap dimensions;
+            dimensions[flutter::EncodableValue("width")] = flutter::EncodableValue(width);
+            dimensions[flutter::EncodableValue("height")] = flutter::EncodableValue(height);
+            response[flutter::EncodableValue("pageDimensions")] = flutter::EncodableValue(dimensions);
+        }
     }
     
     result->Success(flutter::EncodableValue(response));

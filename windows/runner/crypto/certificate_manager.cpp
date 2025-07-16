@@ -3,6 +3,10 @@
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
+#include <fstream> // Added for file operations
+#include <windows.h> // Required for Windows API functions
+#include <wincrypt.h> // Required for cryptographic functions
+#include <ncrypt.h> // Required for NCrypt functions
 
 CertificateManager::CertificateManager() 
     : m_certContext(nullptr), m_cryptProv(0), m_keySpec(0), m_freeProvOrNCryptKey(false) {
@@ -52,82 +56,106 @@ bool CertificateManager::LoadCertificateFromStore(const std::string& thumbprint)
     }
     
     // Get private key handle
-    BOOL callerFreeProvOrNCryptKey = FALSE;
+    DWORD keySpec;
+    BOOL freeProvOrNCryptKey = FALSE;
     if (!CryptAcquireCertificatePrivateKey(
         m_certContext,
-        CRYPT_ACQUIRE_CACHE_FLAG,
+        CRYPT_ACQUIRE_CACHE_FLAG | CRYPT_ACQUIRE_COMPARE_KEY_FLAG,
         nullptr,
         &m_cryptProv,
-        &m_keySpec,
-        &callerFreeProvOrNCryptKey)) {
+        &keySpec,
+        &freeProvOrNCryptKey)) {
         std::cerr << "Failed to acquire private key: " << GetLastError() << std::endl;
+        CertFreeCertificateContext(m_certContext);
+        m_certContext = nullptr;
         return false;
     }
     
-    m_freeProvOrNCryptKey = callerFreeProvOrNCryptKey != FALSE;
-    return true;
+    m_keySpec = keySpec;
+    m_freeProvOrNCryptKey = freeProvOrNCryptKey;
+    
+    return ValidateCertificate();
 }
 
 bool CertificateManager::LoadCertificateFromFile(const std::string& filePath, const std::string& password) {
     Cleanup();
     
-    // Convert file path to wide string
+    // Convert strings to wide strings
     std::wstring wFilePath(filePath.begin(), filePath.end());
-    
-    // Convert password to wide string
     std::wstring wPassword(password.begin(), password.end());
     
-    // Open PKCS#12 file
-    HCERTSTORE hStore = PFXImportCertStore(
-        nullptr, // Use file path instead
-        const_cast<LPCWSTR>(wPassword.c_str()),
-        CRYPT_EXPORTABLE | CRYPT_USER_KEYSET
-    );
+    // Read PKCS#12 file
+    std::ifstream file(filePath, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open certificate file: " << filePath << std::endl;
+        return false;
+    }
     
-    if (!hStore) {
+    file.seekg(0, std::ios::end);
+    size_t fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+    
+    std::vector<BYTE> fileData(fileSize);
+    file.read(reinterpret_cast<char*>(fileData.data()), fileSize);
+    file.close();
+    
+    // Create data blob
+    CRYPT_DATA_BLOB pfxBlob = {0};
+    pfxBlob.cbData = static_cast<DWORD>(fileSize);
+    pfxBlob.pbData = fileData.data();
+    
+    // Import PKCS#12
+    HCERTSTORE hTempStore = PFXImportCertStore(&pfxBlob, wPassword.c_str(), CRYPT_EXPORTABLE);
+    if (!hTempStore) {
         std::cerr << "Failed to import PKCS#12 file: " << GetLastError() << std::endl;
         return false;
     }
     
-    // Find the first certificate with a private key
-    m_certContext = CertEnumCertificatesInStore(hStore, nullptr);
+    // Find the certificate with private key
+    m_certContext = nullptr;
+    PCCERT_CONTEXT pCertContext = nullptr;
+    
+    while ((pCertContext = CertEnumCertificatesInStore(hTempStore, pCertContext)) != nullptr) {
+        DWORD keySpec;
+        BOOL freeProvOrNCryptKey = FALSE;
+        HCRYPTPROV_OR_NCRYPT_KEY_HANDLE hKey;
+        
+        if (CryptAcquireCertificatePrivateKey(
+            pCertContext,
+            CRYPT_ACQUIRE_CACHE_FLAG | CRYPT_ACQUIRE_COMPARE_KEY_FLAG,
+            nullptr,
+            &hKey,
+            &keySpec,
+            &freeProvOrNCryptKey)) {
+            
+            // Found certificate with private key
+            m_certContext = CertDuplicateCertificateContext(pCertContext);
+            m_cryptProv = hKey;
+            m_keySpec = keySpec;
+            m_freeProvOrNCryptKey = freeProvOrNCryptKey;
+            break;
+        }
+    }
+    
+    CertCloseStore(hTempStore, 0);
+    
     if (!m_certContext) {
-        std::cerr << "No certificates found in PKCS#12 file" << std::endl;
-        CertCloseStore(hStore, 0);
+        std::cerr << "No certificate with private key found in PKCS#12 file" << std::endl;
         return false;
     }
     
-    // Duplicate the certificate context so it persists after store closure
-    m_certContext = CertDuplicateCertificateContext(m_certContext);
-    CertCloseStore(hStore, 0);
-    
-    // Get private key handle
-    BOOL callerFreeProvOrNCryptKey = FALSE;
-    if (!CryptAcquireCertificatePrivateKey(
-        m_certContext,
-        CRYPT_ACQUIRE_CACHE_FLAG,
-        nullptr,
-        &m_cryptProv,
-        &m_keySpec,
-        &callerFreeProvOrNCryptKey)) {
-        std::cerr << "Failed to acquire private key from PKCS#12: " << GetLastError() << std::endl;
-        return false;
-    }
-    
-    m_freeProvOrNCryptKey = callerFreeProvOrNCryptKey != FALSE;
-    return true;
+    return ValidateCertificate();
 }
 
 CertificateInfo CertificateManager::GetCertificateInfo() const {
     CertificateInfo info = {};
     
     if (!m_certContext) {
-        info.isValid = false;
         return info;
     }
     
     info.subject = ExtractNameFromCert(m_certContext, CERT_NAME_SIMPLE_DISPLAY_TYPE);
-    info.issuer = ExtractNameFromCert(m_certContext, CERT_NAME_SIMPLE_DISPLAY_TYPE);
+    info.issuer = ExtractNameFromCert(m_certContext, CERT_NAME_ISSUER_FLAG);
     info.serialNumber = FormatSerialNumber(m_certContext->pCertInfo->SerialNumber);
     info.validFrom = FormatDateTime(m_certContext->pCertInfo->NotBefore);
     info.validTo = FormatDateTime(m_certContext->pCertInfo->NotAfter);
@@ -141,40 +169,46 @@ CertificateInfo CertificateManager::GetCertificateInfo() const {
 std::vector<CertificateInfo> CertificateManager::GetAvailableCertificates() const {
     std::vector<CertificateInfo> certificates;
     
+    // Open the Personal certificate store
     HCERTSTORE hStore = CertOpenSystemStore(0, L"MY");
     if (!hStore) {
+        std::cerr << "Failed to open certificate store: " << GetLastError() << std::endl;
         return certificates;
     }
     
-    PCCERT_CONTEXT certContext = nullptr;
-    while ((certContext = CertEnumCertificatesInStore(hStore, certContext)) != nullptr) {
-        // Check if certificate has a private key
-        HCRYPTPROV cryptProv;
+    PCCERT_CONTEXT pCertContext = nullptr;
+    while ((pCertContext = CertEnumCertificatesInStore(hStore, pCertContext)) != nullptr) {
+        // Check if certificate has private key
         DWORD keySpec;
-        BOOL freeProvOrNCryptKey;
+        BOOL freeProvOrNCryptKey = FALSE;
+        HCRYPTPROV_OR_NCRYPT_KEY_HANDLE hKey;
         
         if (CryptAcquireCertificatePrivateKey(
-            certContext,
-            CRYPT_ACQUIRE_CACHE_FLAG | CRYPT_ACQUIRE_SILENT_FLAG,
+            pCertContext,
+            CRYPT_ACQUIRE_CACHE_FLAG | CRYPT_ACQUIRE_COMPARE_KEY_FLAG,
             nullptr,
-            &cryptProv,
+            &hKey,
             &keySpec,
             &freeProvOrNCryptKey)) {
             
             CertificateInfo info = {};
-            info.subject = ExtractNameFromCert(certContext, CERT_NAME_SIMPLE_DISPLAY_TYPE);
-            info.issuer = ExtractNameFromCert(certContext, CERT_NAME_SIMPLE_DISPLAY_TYPE);
-            info.serialNumber = FormatSerialNumber(certContext->pCertInfo->SerialNumber);
-            info.validFrom = FormatDateTime(certContext->pCertInfo->NotBefore);
-            info.validTo = FormatDateTime(certContext->pCertInfo->NotAfter);
-            info.keyUsage = ExtractKeyUsage(certContext);
-            info.thumbprint = CalculateThumbprint(certContext);
+            info.subject = ExtractNameFromCert(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE);
+            info.issuer = ExtractNameFromCert(pCertContext, CERT_NAME_ISSUER_FLAG);
+            info.serialNumber = FormatSerialNumber(pCertContext->pCertInfo->SerialNumber);
+            info.validFrom = FormatDateTime(pCertContext->pCertInfo->NotBefore);
+            info.validTo = FormatDateTime(pCertContext->pCertInfo->NotAfter);
+            info.keyUsage = ExtractKeyUsage(pCertContext);
+            info.thumbprint = CalculateThumbprint(pCertContext);
             info.isValid = true; // Simplified validation
             
             certificates.push_back(info);
             
             if (freeProvOrNCryptKey) {
-                CryptReleaseContext(cryptProv, 0);
+                if (keySpec == CERT_NCRYPT_KEY_SPEC) {
+                    NCryptFreeObject(hKey);
+                } else {
+                    CryptReleaseContext(hKey, 0);
+                }
             }
         }
     }
@@ -197,116 +231,106 @@ bool CertificateManager::ValidateCertificate() const {
     }
     
     // Check if certificate is within validity period
-    FILETIME currentTime;
-    GetSystemTimeAsFileTime(&currentTime);
+    SYSTEMTIME currentTime;
+    GetSystemTime(&currentTime);
     
-    if (CompareFileTime(&currentTime, &m_certContext->pCertInfo->NotBefore) < 0 ||
-        CompareFileTime(&currentTime, &m_certContext->pCertInfo->NotAfter) > 0) {
-        return false;
+    FILETIME currentFileTime;
+    SystemTimeToFileTime(&currentTime, &currentFileTime);
+    
+    // Compare with certificate validity period
+    if (CompareFileTime(&currentFileTime, &m_certContext->pCertInfo->NotBefore) < 0 ||
+        CompareFileTime(&currentFileTime, &m_certContext->pCertInfo->NotAfter) > 0) {
+        return false; // Certificate expired or not yet valid
     }
     
-    // Additional validation could be added here (revocation checking, etc.)
     return true;
 }
 
 std::string CertificateManager::ExtractNameFromCert(PCCERT_CONTEXT certContext, DWORD nameType) const {
-    DWORD size = CertGetNameString(certContext, nameType, 0, nullptr, nullptr, 0);
-    if (size == 0) {
+    DWORD nameSize = CertGetNameString(certContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, nameType, nullptr, nullptr, 0);
+    if (nameSize <= 1) {
         return "";
     }
     
-    std::vector<wchar_t> name(size);
-    CertGetNameString(certContext, nameType, 0, nullptr, name.data(), size);
+    std::vector<wchar_t> nameBuffer(nameSize);
+    CertGetNameString(certContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, nameType, nullptr, nameBuffer.data(), nameSize);
     
-    // Convert wide string to regular string
-    std::wstring wName(name.data());
-    return std::string(wName.begin(), wName.end());
+    // Convert to UTF-8
+    int utf8Size = WideCharToMultiByte(CP_UTF8, 0, nameBuffer.data(), -1, nullptr, 0, nullptr, nullptr);
+    if (utf8Size <= 1) {
+        return "";
+    }
+    
+    std::vector<char> utf8Buffer(utf8Size);
+    WideCharToMultiByte(CP_UTF8, 0, nameBuffer.data(), -1, utf8Buffer.data(), utf8Size, nullptr, nullptr);
+    
+    return std::string(utf8Buffer.data());
 }
 
 std::string CertificateManager::FormatSerialNumber(const CRYPT_INTEGER_BLOB& serialNumber) const {
     std::stringstream ss;
-    for (DWORD i = serialNumber.cbData; i > 0; --i) {
-        ss << std::hex << std::setw(2) << std::setfill('0') 
-           << static_cast<int>(serialNumber.pbData[i - 1]);
+    for (DWORD i = 0; i < serialNumber.cbData; ++i) {
+        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(serialNumber.pbData[serialNumber.cbData - 1 - i]);
     }
     return ss.str();
 }
 
 std::string CertificateManager::FormatDateTime(const FILETIME& fileTime) const {
     SYSTEMTIME systemTime;
-    if (!FileTimeToSystemTime(&fileTime, &systemTime)) {
-        return "";
-    }
+    FileTimeToSystemTime(&fileTime, &systemTime);
     
     std::stringstream ss;
-    ss << systemTime.wYear << "-"
-       << std::setw(2) << std::setfill('0') << systemTime.wMonth << "-"
-       << std::setw(2) << std::setfill('0') << systemTime.wDay;
+    ss << std::setfill('0') << std::setw(4) << systemTime.wYear << "-"
+       << std::setw(2) << systemTime.wMonth << "-"
+       << std::setw(2) << systemTime.wDay << " "
+       << std::setw(2) << systemTime.wHour << ":"
+       << std::setw(2) << systemTime.wMinute << ":"
+       << std::setw(2) << systemTime.wSecond;
     
     return ss.str();
 }
 
 std::vector<std::string> CertificateManager::ExtractKeyUsage(PCCERT_CONTEXT certContext) const {
-    std::vector<std::string> keyUsages;
+    std::vector<std::string> keyUsage;
     
-    PCERT_EXTENSION keyUsageExt = CertFindExtension(
-        szOID_KEY_USAGE,
-        certContext->pCertInfo->cExtension,
-        certContext->pCertInfo->rgExtension
-    );
-    
-    if (keyUsageExt) {
+    PCERT_EXTENSION pExtension = CertFindExtension(szOID_KEY_USAGE, 
+                                                  certContext->pCertInfo->cExtension,
+                                                  certContext->pCertInfo->rgExtension);
+    if (pExtension) {
         CRYPT_BIT_BLOB keyUsageBlob;
         DWORD size = sizeof(keyUsageBlob);
         
-        if (CryptDecodeObjectEx(
-            X509_ASN_ENCODING,
-            X509_KEY_USAGE,
-            keyUsageExt->Value.pbData,
-            keyUsageExt->Value.cbData,
-            0,
-            nullptr,
-            &keyUsageBlob,
-            &size)) {
+        if (CryptDecodeObject(X509_ASN_ENCODING, X509_KEY_USAGE, 
+                             pExtension->Value.pbData, pExtension->Value.cbData,
+                             0, &keyUsageBlob, &size)) {
             
             if (keyUsageBlob.cbData > 0) {
-                BYTE keyUsageByte = keyUsageBlob.pbData[0];
-                
-                if (keyUsageByte & CERT_DIGITAL_SIGNATURE_KEY_USAGE) {
-                    keyUsages.push_back("Digital Signature");
-                }
-                if (keyUsageByte & CERT_NON_REPUDIATION_KEY_USAGE) {
-                    keyUsages.push_back("Non Repudiation");
-                }
-                if (keyUsageByte & CERT_KEY_ENCIPHERMENT_KEY_USAGE) {
-                    keyUsages.push_back("Key Encipherment");
-                }
-                if (keyUsageByte & CERT_DATA_ENCIPHERMENT_KEY_USAGE) {
-                    keyUsages.push_back("Data Encipherment");
-                }
+                BYTE usage = keyUsageBlob.pbData[0];
+                if (usage & CERT_DIGITAL_SIGNATURE_KEY_USAGE) keyUsage.push_back("Digital Signature");
+                if (usage & CERT_NON_REPUDIATION_KEY_USAGE) keyUsage.push_back("Non Repudiation");
+                if (usage & CERT_KEY_ENCIPHERMENT_KEY_USAGE) keyUsage.push_back("Key Encipherment");
+                if (usage & CERT_DATA_ENCIPHERMENT_KEY_USAGE) keyUsage.push_back("Data Encipherment");
+                if (usage & CERT_KEY_AGREEMENT_KEY_USAGE) keyUsage.push_back("Key Agreement");
+                if (usage & CERT_KEY_CERT_SIGN_KEY_USAGE) keyUsage.push_back("Certificate Signing");
+                if (usage & CERT_CRL_SIGN_KEY_USAGE) keyUsage.push_back("CRL Signing");
             }
         }
     }
     
-    return keyUsages;
+    return keyUsage;
 }
 
 std::string CertificateManager::CalculateThumbprint(PCCERT_CONTEXT certContext) const {
-    BYTE thumbprint[20]; // SHA-1 hash is 20 bytes
-    DWORD size = sizeof(thumbprint);
+    BYTE thumbprint[20]; // SHA1 hash
+    DWORD thumbprintSize = sizeof(thumbprint);
     
-    if (!CertGetCertificateContextProperty(
-        certContext,
-        CERT_SHA1_HASH_PROP_ID,
-        thumbprint,
-        &size)) {
+    if (!CertGetCertificateContextProperty(certContext, CERT_SHA1_HASH_PROP_ID, thumbprint, &thumbprintSize)) {
         return "";
     }
     
     std::stringstream ss;
-    for (DWORD i = 0; i < size; ++i) {
-        ss << std::hex << std::setw(2) << std::setfill('0') 
-           << static_cast<int>(thumbprint[i]);
+    for (DWORD i = 0; i < thumbprintSize; ++i) {
+        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(thumbprint[i]);
     }
     
     return ss.str();
@@ -319,7 +343,11 @@ void CertificateManager::Cleanup() {
     }
     
     if (m_cryptProv && m_freeProvOrNCryptKey) {
-        CryptReleaseContext(m_cryptProv, 0);
+        if (m_keySpec == CERT_NCRYPT_KEY_SPEC) {
+            NCryptFreeObject(m_cryptProv);
+        } else {
+            CryptReleaseContext(m_cryptProv, 0);
+        }
         m_cryptProv = 0;
     }
     
