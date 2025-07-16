@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:firmador/src/presentation/screens/certificate_upload_screen.dart';
 import 'package:firmador/src/presentation/screens/backend_signature_screen.dart';
 import 'package:firmador/src/presentation/screens/android_signature_screen.dart';
+import 'package:firmador/src/presentation/screens/windows_signature_screen.dart';
 import 'package:firmador/src/presentation/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
@@ -244,6 +245,73 @@ class WelcomeScreen extends StatelessWidget {
                                   ),
                                   Text(
                                     'Local + Backend híbrido',
+                                    style: TextStyle(
+                                      color: AppTheme.white.withValues(alpha: 0.8),
+                                      fontSize: isSmallScreen ? 12 : 14,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: isSmallScreen ? 12 : 16),
+                        ],
+                        
+                        // Windows Hybrid Mode Button (only show on Windows)
+                        if (Platform.isWindows) ...[
+                          Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.blue.shade700, Colors.blue.shade500],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.blue.withValues(alpha: 0.3),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => const WindowsSignatureScreen(),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                padding: EdgeInsets.symmetric(
+                                  vertical: isSmallScreen ? 16 : 20,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              icon: const Icon(
+                                Icons.desktop_windows,
+                                color: AppTheme.white,
+                                size: 24,
+                              ),
+                              label: Column(
+                                children: [
+                                  Text(
+                                    'Firmador Windows',
+                                    style: TextStyle(
+                                      color: AppTheme.white,
+                                      fontSize: isSmallScreen ? 16 : 18,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Certificate Store + Backend',
                                     style: TextStyle(
                                       color: AppTheme.white.withValues(alpha: 0.8),
                                       fontSize: isSmallScreen ? 12 : 14,

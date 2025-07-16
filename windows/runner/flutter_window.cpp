@@ -3,6 +3,7 @@
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "native_crypto_plugin.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -25,6 +26,12 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  
+  // Register native crypto plugin
+  auto registrar = flutter_controller_->engine()->GetRegistrarForPlugin("NativeCryptoPlugin");
+  NativeCryptoPlugin::RegisterWithRegistrar(
+      static_cast<flutter::PluginRegistrarWindows*>(registrar));
+  
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {

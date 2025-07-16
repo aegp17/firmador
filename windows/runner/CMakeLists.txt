@@ -11,6 +11,10 @@ add_executable(${BINARY_NAME} WIN32
   "main.cpp"
   "utils.cpp"
   "win32_window.cpp"
+  "crypto/certificate_manager.cpp"
+  "crypto/pdf_signer.cpp"
+  "crypto/tsa_client.cpp"
+  "native_crypto_plugin.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
   "Runner.rc"
   "runner.exe.manifest"
@@ -34,6 +38,14 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
+
+# Windows crypto and system libraries for PDF signing
+target_link_libraries(${BINARY_NAME} PRIVATE "crypt32.lib")  # Certificate Store APIs
+target_link_libraries(${BINARY_NAME} PRIVATE "advapi32.lib") # Cryptographic APIs
+target_link_libraries(${BINARY_NAME} PRIVATE "wininet.lib")  # HTTP/HTTPS for TSA
+target_link_libraries(${BINARY_NAME} PRIVATE "ws2_32.lib")   # Winsock for networking
+target_link_libraries(${BINARY_NAME} PRIVATE "bcrypt.lib")   # Modern crypto APIs
+
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.

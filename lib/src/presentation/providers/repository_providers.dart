@@ -1,17 +1,28 @@
+import 'dart:io';
 import 'package:firmador/src/data/repositories/platform_crypto_repository.dart';
+import 'package:firmador/src/data/repositories/windows_crypto_repository.dart';
+import 'package:firmador/src/data/repositories/windows_hybrid_signature_service.dart';
 import 'package:firmador/src/domain/repositories/crypto_repository.dart';
 import 'package:firmador/src/domain/usecases/load_certificate_usecase.dart';
 import 'package:firmador/src/domain/usecases/sign_pdf_usecase.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // 1. Repository Provider
-// For the MVP, we directly provide the Fake implementation.
-// In the future, this could be decided by environment.
+// Platform-specific repository selection
 final cryptoRepositoryProvider = Provider<CryptoRepository>((ref) {
-  return PlatformCryptoRepository();
+  if (Platform.isWindows) {
+    return WindowsCryptoRepository();
+  } else {
+    return PlatformCryptoRepository();
+  }
 });
 
-// 2. Use Case Providers
+// 2. Windows Hybrid Signature Service Provider
+final windowsHybridSignatureServiceProvider = Provider<WindowsHybridSignatureService>((ref) {
+  return WindowsHybridSignatureService();
+});
+
+// 3. Use Case Providers
 // These providers depend on the repository provider.
 
 final loadCertificateUseCaseProvider = Provider<LoadCertificateUseCase>((ref) {
