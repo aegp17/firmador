@@ -41,6 +41,18 @@ class PdfPosition {
     );
   }
 
+  // Convert to Map for Windows native calls
+  Map<String, dynamic> toMap() {
+    final pdfCoords = toPdfCoordinates();
+    return {
+      'x': pdfCoords.x,
+      'y': pdfCoords.y,
+      'pageNumber': pageNumber,
+      'width': pdfCoords.signatureWidth,
+      'height': pdfCoords.signatureHeight,
+    };
+  }
+
   // Compatibility with pdf_provider SignaturePosition
   int get page => pageNumber;
   Offset get position => Offset(x, y);

@@ -1,13 +1,72 @@
-import 'dart:io';
 import 'package:flutter/services.dart';
 import '../../domain/entities/certificate_info.dart';
 import '../../domain/repositories/crypto_repository.dart';
+import 'dart:io';
 
 /// Repository implementation for Windows platform using native Windows crypto APIs
 class WindowsCryptoRepository implements CryptoRepository {
   static const MethodChannel _channel = MethodChannel('com.example.firmador/native_crypto');
 
   @override
+  Future<CertificateInfo> getCertificateInfo({
+    required String p12Path,
+    required String password,
+  }) async {
+    try {
+      final result = await _channel.invokeMethod('getCertificateInfo', {
+        'certificatePath': p12Path,
+        'password': password,
+      });
+      
+      if (result != null) {
+        return CertificateInfo.fromJson(Map<String, dynamic>.from(result));
+      }
+      throw Exception('Failed to load certificate information');
+    } on PlatformException catch (e) {
+      throw Exception('Error loading certificate: ${e.message}');
+    }
+  }
+
+  @override
+  Future<File> signPdf({
+    required String pdfPath,
+    required String p12Path,
+    required String password,
+    required int page,
+    required double x,
+    required double y,
+  }) async {
+    try {
+      final outputPath = pdfPath.replaceAll('.pdf', '_signed.pdf');
+      
+      final result = await _channel.invokeMethod('signPdf', {
+        'pdfPath': pdfPath,
+        'outputPath': outputPath,
+        'certificatePath': p12Path,
+        'password': password,
+        'position': {
+          'x': x,
+          'y': y,
+          'pageNumber': page,
+          'width': 200.0,
+          'height': 50.0,
+        },
+        'includeTimestamp': true,
+      });
+
+      if (result != null && result['success'] == true) {
+        final signedPath = result['signedPdfPath'] as String;
+        return File(signedPath);
+      } else {
+        throw Exception(result?['errorMessage'] ?? 'Signing failed');
+      }
+    } on PlatformException catch (e) {
+      throw Exception('Error signing PDF: ${e.message}');
+    }
+  }
+
+  // Windows-specific methods (not part of the interface but used by Windows hybrid service)
+  
   Future<CertificateInfo?> loadCertificate({
     String? certificatePath,
     String? password,
@@ -36,7 +95,6 @@ class WindowsCryptoRepository implements CryptoRepository {
     }
   }
 
-  @override
   Future<List<CertificateInfo>> getAvailableCertificates() async {
     try {
       final result = await _channel.invokeMethod('getAvailableCertificates');
@@ -53,8 +111,7 @@ class WindowsCryptoRepository implements CryptoRepository {
     }
   }
 
-  @override
-  Future<String?> signPdf({
+  Future<String?> signPdfWithOptions({
     required String pdfPath,
     required String outputPath,
     String? certificatePath,
@@ -70,10 +127,6 @@ class WindowsCryptoRepository implements CryptoRepository {
         'includeTimestamp': includeTimestamp,
       };
 
-      if (position != null) {
-        arguments['position'] = position;
-      }
-
       if (thumbprint != null) {
         arguments['thumbprint'] = thumbprint;
       } else if (certificatePath != null && password != null) {
@@ -83,41 +136,45 @@ class WindowsCryptoRepository implements CryptoRepository {
         throw ArgumentError('Either thumbprint or certificatePath+password must be provided');
       }
 
-      final result = await _channel.invokeMethod('signPdf', arguments);
-      if (result != null && result['success'] == true) {
-        return result['signedPdfPath'];
+      if (position != null) {
+        arguments['position'] = position;
       }
-      return null;
+
+      final result = await _channel.invokeMethod('signPdf', arguments);
+      
+      if (result != null && result['success'] == true) {
+        return result['signedPdfPath'] as String?;
+      } else {
+        throw Exception(result?['errorMessage'] ?? 'Signing failed');
+      }
     } on PlatformException catch (e) {
       print('Error signing PDF: ${e.message}');
       return null;
     }
   }
 
-  @override
-  Future<bool> validatePdf(String pdfPath) async {
-    try {
-      final result = await _channel.invokeMethod('validatePdf', {'pdfPath': pdfPath});
-      return result?['isValid'] ?? false;
-    } on PlatformException catch (e) {
-      print('Error validating PDF: ${e.message}');
-      return false;
-    }
-  }
-
-  /// Test TSA server connectivity
   Future<List<Map<String, dynamic>>> testTSAConnectivity() async {
     try {
       final result = await _channel.invokeMethod('testTSAConnectivity');
-      if (result != null) {
-        return List<Map<String, dynamic>>.from(
-          result.map((server) => Map<String, dynamic>.from(server))
-        );
+      if (result != null && result['servers'] != null) {
+        return List<Map<String, dynamic>>.from(result['servers']);
       }
       return [];
     } on PlatformException catch (e) {
       print('Error testing TSA connectivity: ${e.message}');
       return [];
+    }
+  }
+
+  Future<bool> validatePdf(String pdfPath) async {
+    try {
+      final result = await _channel.invokeMethod('validatePdf', {
+        'pdfPath': pdfPath,
+      });
+      return result?['isValid'] ?? false;
+    } on PlatformException catch (e) {
+      print('Error validating PDF: ${e.message}');
+      return false;
     }
   }
 } 

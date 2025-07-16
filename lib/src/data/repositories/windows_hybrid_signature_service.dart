@@ -58,7 +58,7 @@ class WindowsHybridSignatureService {
     try {
       print('🔧 Attempting Windows local signing...');
       
-      final result = await _windowsRepository.signPdf(
+      final result = await _windowsRepository.signPdfWithOptions(
         pdfPath: pdfPath,
         outputPath: outputPath,
         certificatePath: certificatePath,
@@ -107,23 +107,42 @@ class WindowsHybridSignatureService {
     required Stopwatch stopwatch,
   }) async {
     try {
+      if (certificatePath == null || password == null) {
+        return WindowsSigningResult(
+          success: false,
+          errorMessage: 'Certificate path and password required for backend signing',
+          method: WindowsSigningMethod.backend,
+          duration: stopwatch.elapsed,
+        );
+      }
+
+      // Convert position for backend API
+      double x = 100.0, y = 100.0;
+      int page = 1;
+      
+      if (position != null) {
+        x = (position['x'] as num?)?.toDouble() ?? 100.0;
+        y = (position['y'] as num?)?.toDouble() ?? 100.0;
+        page = (position['pageNumber'] as int?) ?? 1;
+      }
+
       final result = await _backendRepository.signPdf(
         pdfPath: pdfPath,
-        outputPath: outputPath,
-        certificatePath: certificatePath,
+        p12Path: certificatePath,
         password: password,
-        position: position,
-        includeTimestamp: includeTimestamp,
+        page: page,
+        x: x,
+        y: y,
       );
 
       stopwatch.stop();
 
-      if (result != null && File(result).existsSync()) {
+      if (result.existsSync()) {
         print('✅ Backend signing successful in ${stopwatch.elapsedMilliseconds}ms');
         
         return WindowsSigningResult(
           success: true,
-          signedPdfPath: result,
+          signedPdfPath: result.path,
           method: WindowsSigningMethod.backend,
           timestampServer: 'Backend TSA',
           duration: stopwatch.elapsed,
@@ -170,10 +189,14 @@ class WindowsHybridSignatureService {
 
     // Fallback to backend if needed
     if (certificatePath != null && password != null) {
-      return _backendRepository.loadCertificate(
-        certificatePath: certificatePath,
-        password: password,
-      );
+      try {
+        return await _backendRepository.getCertificateInfo(
+          p12Path: certificatePath,
+          password: password,
+        );
+      } catch (e) {
+        print('Backend certificate loading failed: $e');
+      }
     }
 
     return null;
@@ -219,12 +242,8 @@ class WindowsHybridSignatureService {
       print('Windows PDF validation failed: $e');
     }
 
-    // Fallback to backend validation
-    try {
-      return await _backendRepository.validatePdf(pdfPath);
-    } catch (e) {
-      print('Backend PDF validation failed: $e');
-      return false;
-    }
+    // Currently no backend validation available
+    print('Backend PDF validation not implemented');
+    return false;
   }
 } 

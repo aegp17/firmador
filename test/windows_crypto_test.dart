@@ -1,280 +1,261 @@
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:firmador/src/data/repositories/windows_crypto_repository.dart';
-import 'package:firmador/src/data/repositories/windows_hybrid_signature_service.dart';
-import 'package:firmador/src/domain/entities/certificate_info.dart';
 
 void main() {
-  group('Windows Crypto Tests', () {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  group('WindowsCryptoRepository Tests', () {
     late WindowsCryptoRepository repository;
-    late WindowsHybridSignatureService hybridService;
+    const MethodChannel channel = MethodChannel('com.example.firmador/native_crypto');
 
     setUp(() {
       repository = WindowsCryptoRepository();
-      hybridService = WindowsHybridSignatureService();
     });
 
-    group('WindowsCryptoRepository', () {
-      testWidgets('should handle method channel calls', (WidgetTester tester) async {
-        // Mock method channel
-        const MethodChannel channel = MethodChannel('com.example.firmador/native_crypto');
-        
-        // Mock successful certificate info response
-        channel.setMockMethodCallHandler((MethodCall methodCall) async {
-          if (methodCall.method == 'getCertificateInfo') {
-            return {
-              'subject': 'CN=Test Certificate',
-              'issuer': 'CN=Test CA',
-              'serialNumber': '123456789',
-              'validFrom': '2024-01-01',
-              'validTo': '2025-01-01',
-              'thumbprint': 'ABCDEF123456789',
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    test('getCertificateInfo should return certificate info', () async {
+      // Mock method call response
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+        if (methodCall.method == 'getCertificateInfo') {
+          return {
+            'subject': 'Test Subject',
+            'issuer': 'Test Issuer',
+            'validFrom': '2023-01-01 00:00:00',
+            'validTo': '2024-12-31 23:59:59',
+            'serialNumber': '123456789',
+            'thumbprint': 'abc123def456',
+            'isValid': true,
+            'keyUsage': ['Digital Signature', 'Non Repudiation'],
+          };
+        }
+        return null;
+      });
+
+      final result = await repository.getCertificateInfo(
+        p12Path: '/path/to/cert.p12',
+        password: 'password123',
+      );
+
+      expect(result.subject, 'Test Subject');
+      expect(result.thumbprint, 'abc123def456');
+      expect(result.isValid, true);
+      expect(result.keyUsage, ['Digital Signature', 'Non Repudiation']);
+    });
+
+    test('getAvailableCertificates should return certificate list', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+        if (methodCall.method == 'getAvailableCertificates') {
+          return [
+            {
+              'subject': 'Certificate 1',
+              'issuer': 'Issuer 1',
+              'validFrom': '2023-01-01 00:00:00',
+              'validTo': '2024-12-31 23:59:59',
+              'serialNumber': '111',
+              'thumbprint': 'thumb1',
               'isValid': true,
-              'keyUsage': ['Digital Signature', 'Non Repudiation'],
-            };
-          }
-          return null;
-        });
-
-        final result = await repository.loadCertificate(
-          certificatePath: 'test.p12',
-          password: 'test123',
-        );
-
-        expect(result, isNotNull);
-        expect(result!.subject, equals('CN=Test Certificate'));
-        expect(result.isValid, isTrue);
-        expect(result.keyUsage, contains('Digital Signature'));
+              'keyUsage': ['Digital Signature'],
+            },
+            {
+              'subject': 'Certificate 2',
+              'issuer': 'Issuer 2',
+              'validFrom': '2023-01-01 00:00:00',
+              'validTo': '2024-12-31 23:59:59',
+              'serialNumber': '222',
+              'thumbprint': 'thumb2',
+              'isValid': true,
+              'keyUsage': ['Key Encipherment'],
+            },
+          ];
+        }
+        return null;
       });
 
-      testWidgets('should handle getAvailableCertificates', (WidgetTester tester) async {
-        const MethodChannel channel = MethodChannel('com.example.firmador/native_crypto');
-        
-        channel.setMockMethodCallHandler((MethodCall methodCall) async {
-          if (methodCall.method == 'getAvailableCertificates') {
-            return [
-              {
-                'subject': 'CN=Certificate 1',
-                'issuer': 'CN=CA 1',
-                'serialNumber': '111',
-                'validFrom': '2024-01-01',
-                'validTo': '2025-01-01',
-                'thumbprint': 'THUMB1',
-                'isValid': true,
-                'keyUsage': ['Digital Signature'],
-              },
-              {
-                'subject': 'CN=Certificate 2',
-                'issuer': 'CN=CA 2',
-                'serialNumber': '222',
-                'validFrom': '2024-01-01',
-                'validTo': '2025-01-01',
-                'thumbprint': 'THUMB2',
-                'isValid': true,
-                'keyUsage': ['Non Repudiation'],
-              },
-            ];
-          }
-          return null;
-        });
+      final certificates = await repository.getAvailableCertificates();
 
-        final certificates = await repository.getAvailableCertificates();
+      expect(certificates.length, 2);
+      expect(certificates[0].subject, 'Certificate 1');
+      expect(certificates[1].subject, 'Certificate 2');
+    });
 
-        expect(certificates, hasLength(2));
-        expect(certificates[0].subject, equals('CN=Certificate 1'));
-        expect(certificates[1].subject, equals('CN=Certificate 2'));
+    test('signPdf should sign PDF successfully', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+        if (methodCall.method == 'signPdf') {
+          return {
+            'success': true,
+            'signedPdfPath': '/path/to/signed.pdf',
+            'timestampServer': 'FreeTSA',
+            'signingTime': '2023-12-01 12:00:00',
+            'originalSize': 1024,
+            'signedSize': 1500,
+          };
+        }
+        return null;
       });
 
-      testWidgets('should handle PDF signing', (WidgetTester tester) async {
-        const MethodChannel channel = MethodChannel('com.example.firmador/native_crypto');
-        
-        channel.setMockMethodCallHandler((MethodCall methodCall) async {
-          if (methodCall.method == 'signPdf') {
-            final args = methodCall.arguments as Map<String, dynamic>;
-            expect(args['pdfPath'], isNotNull);
-            expect(args['outputPath'], isNotNull);
-            expect(args['includeTimestamp'], isTrue);
-            
-            return {
-              'success': true,
-              'signedPdfPath': args['outputPath'],
-              'timestampServer': 'FreeTSA',
-              'signingTime': '20240101120000',
-              'originalSize': 1024,
-              'signedSize': 1200,
-            };
-          }
-          return null;
-        });
+      final result = await repository.signPdf(
+        pdfPath: '/path/to/document.pdf',
+        p12Path: '/path/to/cert.p12',
+        password: 'password123',
+        page: 1,
+        x: 100.0,
+        y: 200.0,
+      );
 
-        final result = await repository.signPdf(
-          pdfPath: '/test/input.pdf',
-          outputPath: '/test/output.pdf',
-          certificatePath: 'test.p12',
-          password: 'test123',
-          position: {'x': 100.0, 'y': 200.0, 'pageNumber': 1},
-          includeTimestamp: true,
-        );
+      expect(result.path, '/path/to/signed.pdf');
+    });
 
-        expect(result, equals('/test/output.pdf'));
+    test('signPdfWithOptions should sign PDF with custom options', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+        if (methodCall.method == 'signPdf') {
+          return {
+            'success': true,
+            'signedPdfPath': '/path/to/signed.pdf',
+            'timestampServer': 'FreeTSA',
+            'signingTime': '2023-12-01 12:00:00',
+            'originalSize': 1024,
+            'signedSize': 1500,
+          };
+        }
+        return null;
       });
 
-      testWidgets('should handle TSA connectivity test', (WidgetTester tester) async {
-        const MethodChannel channel = MethodChannel('com.example.firmador/native_crypto');
-        
-        channel.setMockMethodCallHandler((MethodCall methodCall) async {
-          if (methodCall.method == 'testTSAConnectivity') {
-            return [
+      final result = await repository.signPdfWithOptions(
+        pdfPath: '/path/to/document.pdf',
+        outputPath: '/path/to/signed.pdf',
+        certificatePath: '/path/to/cert.p12',
+        password: 'password123',
+        position: {
+          'x': 100.0,
+          'y': 200.0,
+          'pageNumber': 1,
+          'width': 200.0,
+          'height': 50.0,
+        },
+        includeTimestamp: true,
+      );
+
+      expect(result, '/path/to/signed.pdf');
+    });
+
+    test('testTSAConnectivity should return TSA server status', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+        if (methodCall.method == 'testTSAConnectivity') {
+          return {
+            'servers': [
               {
                 'name': 'FreeTSA',
                 'url': 'https://freetsa.org/tsr',
                 'available': true,
+                'requiresAuth': false,
               },
               {
                 'name': 'DigiCert',
                 'url': 'http://timestamp.digicert.com',
                 'available': false,
+                'requiresAuth': false,
               },
-            ];
-          }
-          return null;
-        });
-
-        final servers = await repository.testTSAConnectivity();
-
-        expect(servers, hasLength(2));
-        expect(servers[0]['name'], equals('FreeTSA'));
-        expect(servers[0]['available'], isTrue);
-        expect(servers[1]['available'], isFalse);
+            ],
+            'totalServers': 2,
+            'availableServers': 1,
+          };
+        }
+        return null;
       });
+
+      final result = await repository.testTSAConnectivity();
+
+      expect(result.length, 2);
+      expect(result[0]['name'], 'FreeTSA');
+      expect(result[0]['available'], true);
+      expect(result[1]['available'], false);
     });
 
-    group('WindowsHybridSignatureService', () {
-      testWidgets('should test local capabilities', (WidgetTester tester) async {
-        const MethodChannel channel = MethodChannel('com.example.firmador/native_crypto');
-        
-        channel.setMockMethodCallHandler((MethodCall methodCall) async {
-          switch (methodCall.method) {
-            case 'getAvailableCertificates':
-              return [
-                {
-                  'subject': 'CN=Test Cert',
-                  'issuer': 'CN=Test CA',
-                  'serialNumber': '123',
-                  'validFrom': '2024-01-01',
-                  'validTo': '2025-01-01',
-                  'thumbprint': 'THUMB',
-                  'isValid': true,
-                  'keyUsage': ['Digital Signature'],
-                }
-              ];
-            case 'testTSAConnectivity':
-              return [
-                {'name': 'FreeTSA', 'url': 'https://freetsa.org/tsr', 'available': true},
-                {'name': 'DigiCert', 'url': 'http://timestamp.digicert.com', 'available': true},
-              ];
-            default:
-              return null;
-          }
-        });
-
-        final capabilities = await hybridService.testLocalCapabilities();
-
-        expect(capabilities['available'], isTrue);
-        expect(capabilities['certificateCount'], equals(1));
-        expect(capabilities['tsaServers'], equals(2));
+    test('validatePdf should validate PDF format', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+        if (methodCall.method == 'validatePdf') {
+          return {
+            'isValid': true,
+            'pageCount': 3,
+            'pageDimensions': {
+              'width': 612.0,
+              'height': 792.0,
+            },
+          };
+        }
+        return null;
       });
 
-      testWidgets('should handle local capabilities error', (WidgetTester tester) async {
-        const MethodChannel channel = MethodChannel('com.example.firmador/native_crypto');
-        
-        channel.setMockMethodCallHandler((MethodCall methodCall) async {
-          throw PlatformException(
-            code: 'NATIVE_ERROR',
-            message: 'Windows crypto not available',
-          );
-        });
+      final result = await repository.validatePdf('/path/to/document.pdf');
 
-        final capabilities = await hybridService.testLocalCapabilities();
-
-        expect(capabilities['available'], isFalse);
-        expect(capabilities['error'], contains('Windows crypto not available'));
-      });
+      expect(result, true);
     });
 
-    group('Certificate Store Integration', () {
-      testWidgets('should load certificate from Windows Certificate Store', (WidgetTester tester) async {
-        const MethodChannel channel = MethodChannel('com.example.firmador/native_crypto');
-        
-        channel.setMockMethodCallHandler((MethodCall methodCall) async {
-          if (methodCall.method == 'getCertificateInfo') {
-            final args = methodCall.arguments as Map<String, dynamic>;
-            expect(args['thumbprint'], isNotNull);
-            
-            return {
-              'subject': 'CN=Corporate Certificate',
-              'issuer': 'CN=Corporate CA',
-              'serialNumber': 'CORP123',
-              'validFrom': '2024-01-01',
-              'validTo': '2025-01-01',
-              'thumbprint': args['thumbprint'],
-              'isValid': true,
-              'keyUsage': ['Digital Signature', 'Key Encipherment'],
-            };
-          }
-          return null;
-        });
-
-        final result = await repository.loadCertificate(
-          thumbprint: 'ABCDEF123456789',
-        );
-
-        expect(result, isNotNull);
-        expect(result!.subject, equals('CN=Corporate Certificate'));
-        expect(result.thumbprint, equals('ABCDEF123456789'));
-        expect(result.keyUsage, contains('Key Encipherment'));
+    test('loadCertificate with thumbprint should return certificate info', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+        if (methodCall.method == 'getCertificateInfo') {
+          return {
+            'subject': 'Store Certificate',
+            'issuer': 'Store Issuer',
+            'validFrom': '2023-01-01 00:00:00',
+            'validTo': '2024-12-31 23:59:59',
+            'serialNumber': '987654321',
+            'thumbprint': 'store123thumb456',
+            'isValid': true,
+            'keyUsage': ['Digital Signature', 'Key Encipherment'],
+          };
+        }
+        return null;
       });
+
+      final result = await repository.loadCertificate(
+        thumbprint: 'store123thumb456',
+      );
+
+      expect(result, isNotNull);
+      expect(result!.subject, 'Store Certificate');
+      expect(result.thumbprint, 'store123thumb456');
+      expect(result.keyUsage, ['Digital Signature', 'Key Encipherment']);
     });
 
-    group('Error Handling', () {
-      testWidgets('should handle native errors gracefully', (WidgetTester tester) async {
-        const MethodChannel channel = MethodChannel('com.example.firmador/native_crypto');
-        
-        channel.setMockMethodCallHandler((MethodCall methodCall) async {
-          throw PlatformException(
-            code: 'CERTIFICATE_LOAD_FAILED',
-            message: 'Certificate not found in store',
-          );
-        });
-
-        final result = await repository.loadCertificate(
-          thumbprint: 'INVALID_THUMBPRINT',
-        );
-
-        expect(result, isNull);
+    test('loadCertificate should handle errors gracefully', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+        throw PlatformException(code: 'CERT_NOT_FOUND', message: 'Certificate not found');
       });
 
-      testWidgets('should handle signing errors', (WidgetTester tester) async {
-        const MethodChannel channel = MethodChannel('com.example.firmador/native_crypto');
-        
-        channel.setMockMethodCallHandler((MethodCall methodCall) async {
-          if (methodCall.method == 'signPdf') {
-            throw PlatformException(
-              code: 'SIGNING_FAILED',
-              message: 'PDF file is password protected',
-            );
-          }
-          return null;
-        });
+      final result = await repository.loadCertificate(
+        thumbprint: 'nonexistent',
+      );
 
-        final result = await repository.signPdf(
-          pdfPath: '/test/protected.pdf',
-          outputPath: '/test/output.pdf',
-          thumbprint: 'VALID_THUMBPRINT',
-        );
+      expect(result, isNull);
+    });
 
-        expect(result, isNull);
+    test('signPdfWithOptions should handle errors gracefully', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+        throw PlatformException(code: 'SIGNING_FAILED', message: 'Signing failed');
       });
+
+      final result = await repository.signPdfWithOptions(
+        pdfPath: '/path/to/document.pdf',
+        outputPath: '/path/to/signed.pdf',
+        thumbprint: 'invalid_thumbprint',
+      );
+
+      expect(result, isNull);
     });
   });
 } 

@@ -29,7 +29,12 @@ mixin _$CertificateInfo {
       throw _privateConstructorUsedError; // Common name extracted from subject
   List<String> get keyUsages =>
       throw _privateConstructorUsedError; // Key usage and extended key usage
+  List<String> get keyUsage =>
+      throw _privateConstructorUsedError; // Alternative key usage field for Windows compatibility
+  String get thumbprint =>
+      throw _privateConstructorUsedError; // Certificate thumbprint (SHA1 hash)
   bool get isTrusted => throw _privateConstructorUsedError;
+  bool get isValid => throw _privateConstructorUsedError;
 
   /// Create a copy of CertificateInfo
   /// with the given fields replaced by the non-null parameter values.
@@ -53,7 +58,10 @@ abstract class $CertificateInfoCopyWith<$Res> {
     String serialNumber,
     String commonName,
     List<String> keyUsages,
+    List<String> keyUsage,
+    String thumbprint,
     bool isTrusted,
+    bool isValid,
   });
 }
 
@@ -79,7 +87,10 @@ class _$CertificateInfoCopyWithImpl<$Res, $Val extends CertificateInfo>
     Object? serialNumber = null,
     Object? commonName = null,
     Object? keyUsages = null,
+    Object? keyUsage = null,
+    Object? thumbprint = null,
     Object? isTrusted = null,
+    Object? isValid = null,
   }) {
     return _then(
       _value.copyWith(
@@ -111,9 +122,21 @@ class _$CertificateInfoCopyWithImpl<$Res, $Val extends CertificateInfo>
                 ? _value.keyUsages
                 : keyUsages // ignore: cast_nullable_to_non_nullable
                       as List<String>,
+            keyUsage: null == keyUsage
+                ? _value.keyUsage
+                : keyUsage // ignore: cast_nullable_to_non_nullable
+                      as List<String>,
+            thumbprint: null == thumbprint
+                ? _value.thumbprint
+                : thumbprint // ignore: cast_nullable_to_non_nullable
+                      as String,
             isTrusted: null == isTrusted
                 ? _value.isTrusted
                 : isTrusted // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            isValid: null == isValid
+                ? _value.isValid
+                : isValid // ignore: cast_nullable_to_non_nullable
                       as bool,
           )
           as $Val,
@@ -138,7 +161,10 @@ abstract class _$$CertificateInfoImplCopyWith<$Res>
     String serialNumber,
     String commonName,
     List<String> keyUsages,
+    List<String> keyUsage,
+    String thumbprint,
     bool isTrusted,
+    bool isValid,
   });
 }
 
@@ -163,7 +189,10 @@ class __$$CertificateInfoImplCopyWithImpl<$Res>
     Object? serialNumber = null,
     Object? commonName = null,
     Object? keyUsages = null,
+    Object? keyUsage = null,
+    Object? thumbprint = null,
     Object? isTrusted = null,
+    Object? isValid = null,
   }) {
     return _then(
       _$CertificateInfoImpl(
@@ -195,9 +224,21 @@ class __$$CertificateInfoImplCopyWithImpl<$Res>
             ? _value._keyUsages
             : keyUsages // ignore: cast_nullable_to_non_nullable
                   as List<String>,
+        keyUsage: null == keyUsage
+            ? _value._keyUsage
+            : keyUsage // ignore: cast_nullable_to_non_nullable
+                  as List<String>,
+        thumbprint: null == thumbprint
+            ? _value.thumbprint
+            : thumbprint // ignore: cast_nullable_to_non_nullable
+                  as String,
         isTrusted: null == isTrusted
             ? _value.isTrusted
             : isTrusted // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        isValid: null == isValid
+            ? _value.isValid
+            : isValid // ignore: cast_nullable_to_non_nullable
                   as bool,
       ),
     );
@@ -215,8 +256,12 @@ class _$CertificateInfoImpl implements _CertificateInfo {
     this.serialNumber = '',
     this.commonName = '',
     final List<String> keyUsages = const [],
+    final List<String> keyUsage = const [],
+    this.thumbprint = '',
     this.isTrusted = false,
-  }) : _keyUsages = keyUsages;
+    this.isValid = true,
+  }) : _keyUsages = keyUsages,
+       _keyUsage = keyUsage;
 
   @override
   final String subject;
@@ -247,13 +292,31 @@ class _$CertificateInfoImpl implements _CertificateInfo {
   }
 
   // Key usage and extended key usage
+  final List<String> _keyUsage;
+  // Key usage and extended key usage
+  @override
+  @JsonKey()
+  List<String> get keyUsage {
+    if (_keyUsage is EqualUnmodifiableListView) return _keyUsage;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_keyUsage);
+  }
+
+  // Alternative key usage field for Windows compatibility
+  @override
+  @JsonKey()
+  final String thumbprint;
+  // Certificate thumbprint (SHA1 hash)
   @override
   @JsonKey()
   final bool isTrusted;
+  @override
+  @JsonKey()
+  final bool isValid;
 
   @override
   String toString() {
-    return 'CertificateInfo(subject: $subject, issuer: $issuer, validFrom: $validFrom, validTo: $validTo, serialNumber: $serialNumber, commonName: $commonName, keyUsages: $keyUsages, isTrusted: $isTrusted)';
+    return 'CertificateInfo(subject: $subject, issuer: $issuer, validFrom: $validFrom, validTo: $validTo, serialNumber: $serialNumber, commonName: $commonName, keyUsages: $keyUsages, keyUsage: $keyUsage, thumbprint: $thumbprint, isTrusted: $isTrusted, isValid: $isValid)';
   }
 
   @override
@@ -274,8 +337,12 @@ class _$CertificateInfoImpl implements _CertificateInfo {
               other._keyUsages,
               _keyUsages,
             ) &&
+            const DeepCollectionEquality().equals(other._keyUsage, _keyUsage) &&
+            (identical(other.thumbprint, thumbprint) ||
+                other.thumbprint == thumbprint) &&
             (identical(other.isTrusted, isTrusted) ||
-                other.isTrusted == isTrusted));
+                other.isTrusted == isTrusted) &&
+            (identical(other.isValid, isValid) || other.isValid == isValid));
   }
 
   @override
@@ -288,7 +355,10 @@ class _$CertificateInfoImpl implements _CertificateInfo {
     serialNumber,
     commonName,
     const DeepCollectionEquality().hash(_keyUsages),
+    const DeepCollectionEquality().hash(_keyUsage),
+    thumbprint,
     isTrusted,
+    isValid,
   );
 
   /// Create a copy of CertificateInfo
@@ -312,7 +382,10 @@ abstract class _CertificateInfo implements CertificateInfo {
     final String serialNumber,
     final String commonName,
     final List<String> keyUsages,
+    final List<String> keyUsage,
+    final String thumbprint,
     final bool isTrusted,
+    final bool isValid,
   }) = _$CertificateInfoImpl;
 
   @override
@@ -330,7 +403,13 @@ abstract class _CertificateInfo implements CertificateInfo {
   @override
   List<String> get keyUsages; // Key usage and extended key usage
   @override
+  List<String> get keyUsage; // Alternative key usage field for Windows compatibility
+  @override
+  String get thumbprint; // Certificate thumbprint (SHA1 hash)
+  @override
   bool get isTrusted;
+  @override
+  bool get isValid;
 
   /// Create a copy of CertificateInfo
   /// with the given fields replaced by the non-null parameter values.
