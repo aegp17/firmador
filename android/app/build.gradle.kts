@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.example.firmador"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -54,34 +54,7 @@ flutter {
 }
 
 dependencies {
-    // PDF manipulation and digital signing
-    implementation 'com.itextpdf:itext7-core:7.2.5'
-    implementation 'com.itextpdf:sign:7.2.5'
-    implementation 'com.itextpdf:bouncy-castle-adapter:7.2.5'
-    
-    // BouncyCastle cryptography provider
-    implementation 'org.bouncycastle:bcprov-jdk15to18:1.76'
-    implementation 'org.bouncycastle:bcpkix-jdk15to18:1.76'
-    implementation 'org.bouncycastle:bcutil-jdk15to18:1.76'
-    
-    // Apache Commons for utilities
-    implementation 'org.apache.commons:commons-lang3:3.12.0'
-    implementation 'commons-io:commons-io:2.11.0'
-    
-    // HTTP client for TSA requests
-    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
-    
-    // JSON parsing for TSA responses
-    implementation 'org.json:json:20240303'
-    
-    // Kotlin coroutines for async operations
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
-    
-    // Multidex support
-    implementation 'androidx.multidex:multidex:2.0.1'
-    
-    // Logging
-    implementation 'org.slf4j:slf4j-android:1.7.36'
+    // Basic Android dependencies only for now
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
 }
