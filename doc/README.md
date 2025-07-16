@@ -91,4 +91,4 @@ Seguimos el formato estándar ADR:
 ---
 
 📝 **Última actualización**: Julio 2025  
-👥 **Mantenido por**: Equipo de Desarrollo Firmador 
+👥 **Mantenido por**: Angel Gil

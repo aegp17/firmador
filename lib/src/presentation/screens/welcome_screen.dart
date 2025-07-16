@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:firmador/src/presentation/screens/certificate_upload_screen.dart';
 import 'package:firmador/src/presentation/screens/backend_signature_screen.dart';
+import 'package:firmador/src/presentation/screens/android_signature_screen.dart';
 import 'package:firmador/src/presentation/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
@@ -188,7 +190,74 @@ class WelcomeScreen extends StatelessWidget {
                           ),
                         ),
                         SizedBox(height: isSmallScreen ? 12 : 16),
-                        // Local Mode Button
+                        // Android Hybrid Mode Button (only show on Android)
+                        if (Platform.isAndroid) ...[
+                          Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.green.shade600, Colors.green.shade400],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.green.withValues(alpha: 0.3),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => const AndroidSignatureScreen(),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                padding: EdgeInsets.symmetric(
+                                  vertical: isSmallScreen ? 16 : 20,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              icon: const Icon(
+                                Icons.phone_android,
+                                color: AppTheme.white,
+                                size: 24,
+                              ),
+                              label: Column(
+                                children: [
+                                  Text(
+                                    'Firmador Android',
+                                    style: TextStyle(
+                                      color: AppTheme.white,
+                                      fontSize: isSmallScreen ? 16 : 18,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Local + Backend híbrido',
+                                    style: TextStyle(
+                                      color: AppTheme.white.withValues(alpha: 0.8),
+                                      fontSize: isSmallScreen ? 12 : 14,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: isSmallScreen ? 12 : 16),
+                        ],
+                        
+                        // Legacy Local Mode Button
                         Container(
                           width: double.infinity,
                           decoration: BoxDecoration(
@@ -218,14 +287,14 @@ class WelcomeScreen extends StatelessWidget {
                               ),
                             ),
                             icon: const Icon(
-                              Icons.phone_android,
+                              Icons.security,
                               color: AppTheme.white,
                               size: 24,
                             ),
                             label: Column(
                               children: [
                                 Text(
-                                  'Firmar Localmente',
+                                  'Modo Compatibilidad',
                                   style: TextStyle(
                                     color: AppTheme.white,
                                     fontSize: isSmallScreen ? 16 : 18,
@@ -233,7 +302,7 @@ class WelcomeScreen extends StatelessWidget {
                                   ),
                                 ),
                                 Text(
-                                  'Solo disponible en Android',
+                                  Platform.isAndroid ? 'Simulación básica' : 'Solo disponible en Android',
                                   style: TextStyle(
                                     color: AppTheme.white.withValues(alpha: 0.8),
                                     fontSize: isSmallScreen ? 12 : 14,
