@@ -1,13 +1,36 @@
-import 'dart:io';
 import 'package:firmador/src/presentation/screens/certificate_upload_screen.dart';
 import 'package:firmador/src/presentation/screens/backend_signature_screen.dart';
 import 'package:firmador/src/presentation/screens/android_signature_screen.dart';
 import 'package:firmador/src/presentation/screens/windows_signature_screen.dart';
+import 'package:firmador/src/presentation/screens/collaborative_sessions_screen.dart';
 import 'package:firmador/src/presentation/theme/app_theme.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+
+// Conditional import for Platform - only import when not on web
+import 'dart:io' if (dart.library.html) 'platform_stub.dart' show Platform;
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
+  
+  // Helper methods to check platform safely
+  static bool get isAndroid {
+    if (kIsWeb) return false;
+    try {
+      return Platform.isAndroid;
+    } catch (e) {
+      return false;
+    }
+  }
+  
+  static bool get isWindows {
+    if (kIsWeb) return false;
+    try {
+      return Platform.isWindows;
+    } catch (e) {
+      return false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -192,7 +215,7 @@ class WelcomeScreen extends StatelessWidget {
                         ),
                         SizedBox(height: isSmallScreen ? 12 : 16),
                         // Android Hybrid Mode Button (only show on Android)
-                        if (Platform.isAndroid) ...[
+                        if (WelcomeScreen.isAndroid) ...[
                           Container(
                             width: double.infinity,
                             decoration: BoxDecoration(
@@ -259,7 +282,7 @@ class WelcomeScreen extends StatelessWidget {
                         ],
                         
                         // Windows Hybrid Mode Button (only show on Windows)
-                        if (Platform.isWindows) ...[
+                        if (WelcomeScreen.isWindows) ...[
                           Container(
                             width: double.infinity,
                             decoration: BoxDecoration(
@@ -325,6 +348,71 @@ class WelcomeScreen extends StatelessWidget {
                           SizedBox(height: isSmallScreen ? 12 : 16),
                         ],
                         
+                        // Collaborative Signing Button
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Colors.purple.shade600, Colors.purple.shade400],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.purple.withValues(alpha: 0.3),
+                                blurRadius: 15,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => const CollaborativeSessionsScreen(),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              padding: EdgeInsets.symmetric(
+                                vertical: isSmallScreen ? 16 : 20,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            icon: const Icon(
+                              Icons.people,
+                              color: AppTheme.white,
+                              size: 24,
+                            ),
+                            label: Column(
+                              children: [
+                                Text(
+                                  'Firma Colaborativa',
+                                  style: TextStyle(
+                                    color: AppTheme.white,
+                                    fontSize: isSmallScreen ? 16 : 18,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  'Firma con múltiples participantes',
+                                  style: TextStyle(
+                                    color: AppTheme.white.withValues(alpha: 0.8),
+                                    fontSize: isSmallScreen ? 12 : 14,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: isSmallScreen ? 12 : 16),
+                        
                         // Legacy Local Mode Button
                         Container(
                           width: double.infinity,
@@ -370,7 +458,11 @@ class WelcomeScreen extends StatelessWidget {
                                   ),
                                 ),
                                 Text(
-                                  Platform.isAndroid ? 'Simulación básica' : 'Solo disponible en Android',
+                                  kIsWeb 
+                                    ? 'Disponible en todas las plataformas' 
+                                    : (WelcomeScreen.isAndroid 
+                                        ? 'Simulación básica' 
+                                        : 'Solo disponible en Android'),
                                   style: TextStyle(
                                     color: AppTheme.white.withValues(alpha: 0.8),
                                     fontSize: isSmallScreen ? 12 : 14,

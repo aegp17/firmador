@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
 import 'package:firmador/src/data/services/backend_signature_service.dart';
 import 'package:firmador/src/data/services/user_preferences_service.dart';
@@ -1091,13 +1092,25 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf'],
+      withData: kIsWeb, // Load bytes on web
     );
 
-    if (result != null && result.files.single.path != null) {
-      setState(() {
-        _selectedDocument = File(result.files.single.path!);
-        _signaturePosition = null; // Reset signature position
-      });
+    if (result != null && result.files.isNotEmpty) {
+      final file = result.files.single;
+      if (kIsWeb) {
+        // On web, we can't use File from dart:io
+        // Store the PlatformFile and handle it differently
+        setState(() {
+          _selectedDocument = null; // Will need to handle web files differently
+          _signaturePosition = null;
+        });
+        // TODO: Handle web file bytes for PDF selection
+      } else if (file.path != null) {
+        setState(() {
+          _selectedDocument = File(file.path!);
+          _signaturePosition = null; // Reset signature position
+        });
+      }
     }
   }
 
@@ -1105,15 +1118,28 @@ class _BackendSignatureScreenState extends ConsumerState<BackendSignatureScreen>
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['p12', 'pfx'],
+      withData: kIsWeb, // Load bytes on web
     );
 
-    if (result != null && result.files.single.path != null) {
-      setState(() {
-        _selectedCertificate = File(result.files.single.path!);
-        _passwordController.clear();
-        _certificateInfo = null;
-        _isCertificateValid = false;
-      });
+    if (result != null && result.files.isNotEmpty) {
+      final file = result.files.single;
+      if (kIsWeb) {
+        // On web, we can't use File from dart:io
+        setState(() {
+          _selectedCertificate = null; // Will need to handle web files differently
+          _passwordController.clear();
+          _certificateInfo = null;
+          _isCertificateValid = false;
+        });
+        // TODO: Handle web file bytes for certificate
+      } else if (file.path != null) {
+        setState(() {
+          _selectedCertificate = File(file.path!);
+          _passwordController.clear();
+          _certificateInfo = null;
+          _isCertificateValid = false;
+        });
+      }
     }
   }
 
